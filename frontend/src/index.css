@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 font-sans;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply tracking-tight font-semibold text-slate-900;
+  }
+
+  ::selection {
+    @apply bg-indigo-500/20 text-indigo-900;
+  }
+}
+
+@layer components {
+
+  /* Botones Premium */
+  .btn-primary {
+    @apply inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-medium py-2.5 px-5 rounded-lg shadow-sm hover:shadow transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-200 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-100 font-medium py-2.5 px-5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500/20;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium py-2.5 px-5 rounded-lg transition-colors;
+  }
+
+  /* Tarjetas con efecto de vidrio/profundidad */
+  .card-premium {
+    @apply bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-200/40 transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:shadow-2xl hover:shadow-slate-200/60 hover:-translate-y-1;
+  }
+
+  /* Inputs Modernos */
+  .input-label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
+  }
+
+  .input-modern {
+    @apply w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-200 py-2.5 px-3 sm:text-sm shadow-sm;
+  }
+
+  .input-error {
+    @apply border-red-300 focus:border-red-500 focus:ring-red-100;
+  }
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-50;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-200 rounded-full border-2 border-slate-50;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-300;
+}

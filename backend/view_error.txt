@@ -1,0 +1,6 @@
+Error Type: <class 'ModuleNotFoundError'>
+Error: No module named 'matplotlib'
+Traceback (most recent call last):
+  File "C:\Users\Soporte\Documents\PROYECTOS NETFORCE\ERP EDUCATIVA\backend\academic\views.py", line 268, in download_report_card
+    import matplotlib
+ModuleNotFoundError: No module named 'matplotlib'

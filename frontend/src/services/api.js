@@ -1,0 +1,55 @@
+import axios from 'axios';
+
+const api = axios.create({
+    baseURL: 'http://127.0.0.1:8000/api', // Ajustar URL si es necesario
+    headers: {
+        // 'Content-Type': 'application/json', // Let axios set it automatically
+    },
+});
+
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+
+        const activeInstitution = localStorage.getItem('active_institution');
+        if (activeInstitution && activeInstitution !== 'null' && activeInstitution !== 'undefined') {
+            config.headers['X-Institution-ID'] = activeInstitution;
+        }
+
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+        // Evitar intentar refrescar si el error viene del propio endpoint de login o refresh
+        if (error.response && error.response.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/login') && !originalRequest.url.includes('/auth/refresh')) {
+            originalRequest._retry = true;
+            try {
+                const refreshToken = localStorage.getItem('refresh_token');
+                const response = await api.post('/auth/refresh/', {
+                    refresh: refreshToken,
+                });
+                const { access } = response.data;
+                localStorage.setItem('access_token', access);
+                api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+                return api(originalRequest);
+            } catch (refreshError) {
+                // Logout user if refresh fails
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                window.location.href = '/login';
+                return Promise.reject(refreshError);
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+export default api;

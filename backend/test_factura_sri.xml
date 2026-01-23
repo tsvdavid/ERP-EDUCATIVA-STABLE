@@ -1,0 +1,47 @@
+<?xml version="1.0" ?>
+<factura id="comprobante" version="1.0.0">
+  <infoTributaria>
+    <ambiente>1</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>Prisca Linder</razonSocial>
+    <nombreComercial>Prisca Linder</nombreComercial>
+    <ruc>1790000000001</ruc>
+    <claveAcceso>1201202601179000000000110010010000000067102738819</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>001</estab>
+    <ptoEmi>001</ptoEmi>
+    <secuencial>000000006</secuencial>
+    <dirMatriz>Av. Amazonas y Naciones Unidas</dirMatriz>
+  </infoTributaria>
+  <infoFactura>
+    <fechaEmision>12/01/2026</fechaEmision>
+    <dirEstablecimiento>Av. Amazonas y Naciones Unidas</dirEstablecimiento>
+    <obligadoContabilidad>SI</obligadoContabilidad>
+    <tipoIdentificacionComprador>05</tipoIdentificacionComprador>
+    <razonSocialComprador>Consumidor Final</razonSocialComprador>
+    <identificacionComprador>1710000000</identificacionComprador>
+    <direccionComprador>Sin Dirección</direccionComprador>
+    <totalSinImpuestos>100.00</totalSinImpuestos>
+    <totalDescuento>0.00</totalDescuento>
+    <totalConImpuestos>
+      <totalImpuesto>
+        <codigo>2</codigo>
+        <codigoPorcentaje>4</codigoPorcentaje>
+        <baseImponible>100.00</baseImponible>
+        <valor>15.00</valor>
+      </totalImpuesto>
+    </totalConImpuestos>
+    <propina>0.00</propina>
+    <importeTotal>115.00</importeTotal>
+    <moneda>DOLAR</moneda>
+    <pagos>
+      <pago>
+        <formaPago>EFE</formaPago>
+        <total>115.00</total>
+        <plazo>0</plazo>
+        <unidadTiempo>dias</unidadTiempo>
+      </pago>
+    </pagos>
+  </infoFactura>
+  <detalles/>
+</factura>

@@ -43,19 +43,19 @@ class ARCORequestViewSet(viewsets.ModelViewSet):
         # Optimize query
         base_qs = ARCORequest.objects.select_related('institution', 'requester')
 
-        if user.role == 'ADMIN': 
-            # Allow admins to see requests for their institution OR their own personal requests
-            qs = base_qs
-            
-            # Filter by institution if available, otherwise just personal
+        # 1. Superusers always see everything
+        if user.is_superuser:
+            return base_qs
+
+        # 2. Admins and Rectors see their institution's requests
+        if user.role in ['ADMIN', 'RECTOR']: 
             if user.institution:
-                qs = qs.filter(Q(institution=user.institution) | Q(requester=user))
-            else:
-                # If admin has no institution, they can only see their own requests (or fallback inst if we want)
-                # For safety/clarity, ensure they always see their own.
-                qs = qs.filter(requester=user)
-                
-            return qs.distinct()
+                # Show requests from their institution OR their own personal requests
+                qs = base_qs.filter(Q(institution=user.institution) | Q(requester=user))
+                return qs.distinct()
+            
+        # 3. Everyone else (Student, Parent, Teacher) OR Admins without institution
+        # only see their own requests.
         return base_qs.filter(requester=user)
 
     def perform_create(self, serializer):

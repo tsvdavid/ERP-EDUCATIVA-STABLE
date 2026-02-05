@@ -120,6 +120,7 @@ const ConsentManager = () => {
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Solicitante</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Derecho</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
@@ -130,6 +131,10 @@ const ConsentManager = () => {
                                         <tr key={req.id}>
                                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                                                 {new Date(req.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                                <div className="font-medium">{req.requester_data?.first_name} {req.requester_data?.last_name}</div>
+                                                <div className="text-xs text-gray-500">{req.requester_data?.username}</div>
                                             </td>
                                             <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
                                                 {req.right_type === 'ACCESS' && 'Acceso'}

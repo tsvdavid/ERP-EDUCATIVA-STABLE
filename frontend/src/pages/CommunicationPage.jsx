@@ -521,38 +521,72 @@ const CommunicationPage = () => {
                                     )}
 
                                     {/* Section 2: Non-Event Notices (Green Alerts) */}
-                                    {notices.filter(n => !n.event_date).length > 0 && (
-                                        <div className="space-y-3 mb-6">
-                                            <h4 className="text-xs font-bold text-green-700 uppercase tracking-widest pl-1">Avisos Generales</h4>
-                                            {notices.filter(n => !n.event_date).map(notice => (
-                                                <div key={notice.id} className="bg-green-50 border border-green-100 rounded-lg p-4 flex gap-4 relative group">
-                                                    {(user.role === 'ADMIN' || user.role === 'RECTOR' || user.id === notice.author) && (
-                                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button onClick={() => openEditModal(notice)} className="p-1 bg-green-200 text-green-800 rounded hover:bg-green-300" title="Editar"><FileText size={14} /></button>
-                                                            <button onClick={() => handleDeleteNotice(notice.id)} className="p-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Eliminar"><X size={14} /></button>
-                                                        </div>
-                                                    )}
+                                    {(() => {
+                                        const now = new Date();
+                                        const datedNotices = notices.filter(n => {
+                                            if (!n.event_date) return false; // Handled by General Notices section? No, let's keep dated ones here.
 
-                                                    <div className="bg-green-100 p-2 rounded-full h-fit text-green-600 shrink-0"><Bell size={20} /></div>
-                                                    <div className="flex-1">
-                                                        <div className="flex justify-between items-start">
-                                                            <h4 className="font-bold text-green-800">{notice.title}</h4>
-                                                            <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">{new Date(notice.created_at).toLocaleDateString()}</span>
+                                            // Check expiration
+                                            if (n.event_end_date) {
+                                                const end = new Date(n.event_end_date);
+                                                if (now > end) return false; // Expired
+                                            }
+                                            // If no end date, we assume it's valid (or maybe 1 day? users said "put start and expiration", so expiration matters)
+                                            // If only Start Date is present (Event), we show it. 
+                                            // Ideally we might hide it if it's WAY in the past (e.g. event was last week), but without end date hard to say.
+                                            // Logic: Show all dated notices that aren't expired.
+                                            return true;
+                                        });
+
+                                        if (datedNotices.length === 0) return null;
+
+                                        return (
+                                            <div className="space-y-3 mb-6">
+                                                <h4 className="text-xs font-bold text-green-700 uppercase tracking-widest pl-1">Agenda y Eventos</h4>
+                                                {datedNotices.map(notice => {
+                                                    const start = new Date(notice.event_date);
+                                                    const isFuture = start > now;
+
+                                                    return (
+                                                        <div key={notice.id} className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex gap-4 relative group">
+                                                            {(user.role === 'ADMIN' || user.role === 'RECTOR' || user.id === notice.author) && (
+                                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button onClick={() => openEditModal(notice)} className="p-1 bg-blue-200 text-blue-800 rounded hover:bg-blue-300" title="Editar"><FileText size={14} /></button>
+                                                                    <button onClick={() => handleDeleteNotice(notice.id)} className="p-1 bg-red-200 text-red-800 rounded hover:bg-red-300" title="Eliminar"><X size={14} /></button>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="bg-blue-100 p-2 rounded-full h-fit text-blue-600 shrink-0"><CalendarIcon size={20} /></div>
+                                                            <div className="flex-1">
+                                                                <div className="flex justify-between items-start">
+                                                                    <h4 className="font-bold text-blue-800">{notice.title}</h4>
+                                                                    <div className="flex flex-col items-end gap-1">
+                                                                        <span className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                                                                            {new Date(notice.created_at).toLocaleDateString()}
+                                                                        </span>
+                                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${isFuture ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
+                                                                            <CalendarIcon size={10} />
+                                                                            {isFuture ? 'Evento: ' : 'En curso: '}
+                                                                            {start.toLocaleDateString()} {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <p className="text-blue-900/80 text-sm mt-1 whitespace-pre-wrap">{notice.content}</p>
+                                                                {notice.attachment && (
+                                                                    <a href={notice.attachment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-700 hover:text-blue-900 mt-2 hover:underline">
+                                                                        <Paperclip size={12} /> Ver Adjunto
+                                                                    </a>
+                                                                )}
+                                                                <div className="mt-2 text-xs text-blue-600">
+                                                                    Por: {notice.author_name}
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <p className="text-green-900/80 text-sm mt-1 whitespace-pre-wrap">{notice.content}</p>
-                                                        {notice.attachment && (
-                                                            <a href={notice.attachment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-green-700 hover:text-green-900 mt-2 hover:underline">
-                                                                <Paperclip size={12} /> Ver Adjunto
-                                                            </a>
-                                                        )}
-                                                        <div className="mt-2 text-xs text-green-600">
-                                                            Por: {notice.author_name}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* Modal Logic (Create Notice, Holiday) - kept same */}
                                     {/* ... existing modal logic ... */}

@@ -63,7 +63,7 @@ class NoticeViewSet(viewsets.ModelViewSet):
         if user.institution:
              # Filter based on author's institution OR target course's institution
              # Best: Filter where author is in the same institution
-             queryset = queryset.filter(author__institution=user.institution)
+             queryset = queryset.filter(Q(author__institution=user.institution) | Q(author__institution__isnull=True))
              
         if user.role == 'ADMIN' or user.role == 'RECTOR':
              return queryset.order_by('-created_at')
@@ -89,10 +89,16 @@ class NoticeViewSet(viewsets.ModelViewSet):
             # Teachers see:
             # 1. Notes they authored
             # 2. Global announcements for Teachers/All (No course specific)
+            # 3. Course announcements where they teach a subject
             
+            # Get courses where this teacher teaches a subject
+            from academic.models import Subject
+            teacher_courses = Subject.objects.filter(teacher=user).values_list('course', flat=True)
+
             queryset = queryset.filter(
                 Q(author=user) |
-                (Q(target_course__isnull=True) & Q(target_students__isnull=True) & Q(target_role__in=['ALL', 'TEACHER']))
+                (Q(target_course__isnull=True) & Q(target_students__isnull=True) & Q(target_role__in=['ALL', 'TEACHER'])) |
+                (Q(target_course__in=teacher_courses) & Q(target_role__in=['ALL', 'TEACHER']))
             ).distinct()
             
         elif user.role == 'PARENT':

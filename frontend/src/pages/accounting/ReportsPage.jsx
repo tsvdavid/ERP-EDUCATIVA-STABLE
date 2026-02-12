@@ -137,7 +137,7 @@ const ReportsPage = () => {
             );
         }
 
-        if (!data) return <div className="text-center py-20 text-slate-400">No hay datos disponibles.</div>;
+        if (!data || Array.isArray(data) || Object.keys(data).length === 0) return <div className="text-center py-20 text-slate-400">No hay datos disponibles o formato incorrecto.</div>;
 
         if (activeTab === 'balance_sheet') {
             return (
@@ -153,7 +153,7 @@ const ReportsPage = () => {
                             {renderAccountTree(data.assets)}
                             <div className="mt-4 pt-4 border-t-2 border-slate-800 flex justify-between font-bold text-lg">
                                 <span>TOTAL ACTIVOS</span>
-                                <span>${data.total_assets.toLocaleString()}</span>
+                                <span>${(data.total_assets || 0).toLocaleString()}</span>
                             </div>
                         </div>
 
@@ -205,7 +205,7 @@ const ReportsPage = () => {
                         {renderAccountTree(data.income)}
                         <div className="mt-4 pt-2 flex justify-between font-bold text-lg text-green-800">
                             <span>TOTAL INGRESOS</span>
-                            <span>${data.total_income.toLocaleString()}</span>
+                            <span>${(data.total_income || 0).toLocaleString()}</span>
                         </div>
                     </div>
 
@@ -214,14 +214,14 @@ const ReportsPage = () => {
                         {renderAccountTree(data.expenses)}
                         <div className="mt-4 pt-2 flex justify-between font-bold text-lg text-red-800">
                             <span>TOTAL GASTOS</span>
-                            <span>${data.total_expenses.toLocaleString()}</span>
+                            <span>${(data.total_expenses || 0).toLocaleString()}</span>
                         </div>
                     </div>
 
                     <div className="mt-8 pt-4 border-t-4 border-double border-slate-800 flex justify-between font-bold text-2xl bg-slate-50 p-4 rounded-xl">
                         <span>UTILIDAD NETA</span>
-                        <span className={data.net_income >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            ${data.net_income.toLocaleString()}
+                        <span className={(data.net_income || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            ${(data.net_income || 0).toLocaleString()}
                         </span>
                     </div>
                 </div>

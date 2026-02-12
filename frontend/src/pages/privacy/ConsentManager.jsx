@@ -21,12 +21,12 @@ const ConsentManager = () => {
                 privacyService.getConsents(),
                 privacyService.getARCORequests()
             ]);
-            setPolicies(pRes.data);
-            setArcoRequests(aRes.data);
+            setPolicies(pRes);
+            setArcoRequests(aRes);
 
             // Map user's existing consents
             const consentMap = {};
-            cRes.data.forEach(c => {
+            cRes.forEach(c => {
                 consentMap[c.policy] = c.accepted;
             });
             setConsents(consentMap);

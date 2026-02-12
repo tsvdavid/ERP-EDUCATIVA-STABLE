@@ -29,8 +29,8 @@ const TicketPortal = () => {
                 helpdeskService.getTickets(),
                 helpdeskService.getCatalog()
             ]);
-            setTickets(ticketsRes.data);
-            setCatalog(catalogRes.data);
+            setTickets(ticketsRes);
+            setCatalog(catalogRes);
         } catch (error) {
             console.error("Error fetching helpdesk data", error);
         }

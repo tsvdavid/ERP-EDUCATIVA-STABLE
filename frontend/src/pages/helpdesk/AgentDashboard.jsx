@@ -23,8 +23,8 @@ const AgentDashboard = () => {
                 helpdeskService.getTickets(),
                 helpdeskService.getCatalog()
             ]);
-            setTickets(tRes.data);
-            setCategories(cRes.data);
+            setTickets(tRes);
+            setCategories(cRes);
         } catch (error) {
             console.error(error);
         } finally {
@@ -60,7 +60,7 @@ const AgentDashboard = () => {
             alert("Categoría creada");
             // Reload categories
             const cRes = await helpdeskService.getCatalog();
-            setCategories(cRes.data);
+            setCategories(cRes);
         } catch (error) {
             alert("Error creando categoría");
         }

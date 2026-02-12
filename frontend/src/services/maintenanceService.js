@@ -21,7 +21,13 @@ const maintenanceService = {
 
     getUsersForMaintenance: async () => {
         const response = await api.get('/maintenance/users/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
 
     deleteUsers: async (userIds) => {
@@ -33,7 +39,13 @@ const maintenanceService = {
 
     getLog: async () => {
         const response = await api.get('/maintenance/log/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
 
     resetApplication: async () => {

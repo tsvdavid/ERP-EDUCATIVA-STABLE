@@ -2,11 +2,29 @@ import api from './api';
 
 const helpdeskService = {
     // Catalog
-    getCatalog: () => api.get('/helpdesk/catalog/'),
+    getCatalog: async () => {
+        const response = await api.get('/helpdesk/catalog/');
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
     createCategory: (data) => api.post('/helpdesk/catalog/', data),
 
     // Tickets
-    getTickets: () => api.get('/helpdesk/tickets/'),
+    getTickets: async () => {
+        const response = await api.get('/helpdesk/tickets/');
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
     getTicket: (id) => api.get(`/helpdesk/tickets/${id}/`),
     createTicket: (data) => api.post('/helpdesk/tickets/', data),
     updateTicket: (id, data) => api.patch(`/helpdesk/tickets/${id}/`, data),
@@ -29,7 +47,16 @@ const helpdeskService = {
     },
 
     // Workflows (Admin)
-    getWorkflows: () => api.get('/helpdesk/workflows/'),
+    getWorkflows: async () => {
+        const response = await api.get('/helpdesk/workflows/');
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
 };
 
 export default helpdeskService;

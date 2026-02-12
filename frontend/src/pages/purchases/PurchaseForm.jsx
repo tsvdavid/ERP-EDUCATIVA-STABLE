@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import purchaseService from '../../services/purchaseService';
-import userService from '../../services/userService'; // Assuming we might need generic lookups, but lets stick to purchaseService for now
-// We need accounts for the select. 
-import axios from 'axios'; // Direct call for accounts or use service if available. 
-// Let's assume we need an accountingService or similar. 
-// For now I'll create a quick fetch in useEffect or add to purchaseService if suitable? 
-// Actually accounting accounts are in accountingService (not created yet for frontend).
-// I'll make a direct fetch to /api/accounting/accounts/ for now or add getAccounts to purchaseService as a helper.
+import accountingService from '../../services/accountingService';
 
 const PurchaseForm = () => {
     const navigate = useNavigate();
@@ -37,12 +31,9 @@ const PurchaseForm = () => {
                 setSuppliers(supps);
 
                 // Fetch Expense Accounts
-                const token = localStorage.getItem('token');
-                const accRes = await axios.get('http://localhost:8000/api/accounting/accounts/?roots=false', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const accRes = await accountingService.getAccounts({ roots: false });
                 // Filter only expenses if possible on frontend or backend
-                const expenseAccounts = accRes.data.filter(a => a.account_type === 'EXPENSE');
+                const expenseAccounts = accRes.filter(a => a.account_type === 'EXPENSE');
                 setAccounts(expenseAccounts);
             } catch (error) {
                 console.error("Error loading form data", error);

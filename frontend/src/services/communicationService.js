@@ -3,15 +3,33 @@ import api from './api';
 const communicationService = {
     getMessages: async () => {
         const response = await api.get('/communication/messages/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     getInbox: async () => {
         const response = await api.get('/communication/messages/inbox/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     getSent: async () => {
         const response = await api.get('/communication/messages/sent/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     sendMessage: async (data) => {
         const config = (data instanceof FormData) ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
@@ -24,11 +42,23 @@ const communicationService = {
     },
     getNotifications: async () => {
         const response = await api.get('/communication/notifications/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     getNotices: async () => {
         const response = await api.get('/communication/notices/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createNotice: async (data) => {
         // Handle both JSON and FormData logic if needed, but for files we need FormData
@@ -54,7 +84,13 @@ const communicationService = {
     },
     getHolidays: async () => {
         const response = await api.get('/communication/holidays/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     populateHolidays: async (year) => {
         const response = await api.post('/communication/holidays/populate_holidays/', { year });

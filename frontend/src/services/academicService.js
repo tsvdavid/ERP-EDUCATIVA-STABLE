@@ -4,7 +4,13 @@ const academicService = {
     // Cursos
     getCourses: async () => {
         const response = await api.get('/academic/courses/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createCourse: async (courseData) => {
         const response = await api.post('/academic/courses/', courseData);
@@ -22,7 +28,13 @@ const academicService = {
     // Materias
     getSubjects: async () => {
         const response = await api.get('/academic/subjects/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createSubject: async (data) => {
         const response = await api.post('/academic/subjects/', data);
@@ -48,7 +60,13 @@ const academicService = {
         if (queryString) url += `?${queryString}`;
 
         const response = await api.get(url);
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createEnrollment: async (data) => {
         const response = await api.post('/academic/enrollments/', data);
@@ -73,7 +91,13 @@ const academicService = {
         if (queryString) url += `?${queryString}`;
 
         const response = await api.get(url);
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createGrade: async (data) => {
         const response = await api.post('/academic/grades/', data);
@@ -99,7 +123,13 @@ const academicService = {
         if (queryString) url += `?${queryString}`;
 
         const response = await api.get(url);
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createEvaluationCategory: async (data) => {
         const response = await api.post('/academic/evaluation-categories/', data);
@@ -113,7 +143,13 @@ const academicService = {
     // Asistencia
     getAttendance: async (courseId, date) => {
         const response = await api.get(`/academic/attendance/?course_id=${courseId}&date=${date}`);
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createAttendance: async (data) => {
         const response = await api.post('/academic/attendance/', data);
@@ -126,7 +162,13 @@ const academicService = {
     // Años y Periodos Lectivos
     getAcademicYears: async () => {
         const response = await api.get('/academic/academic-years/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createAcademicYear: async (data) => {
         const response = await api.post('/academic/academic-years/', data);

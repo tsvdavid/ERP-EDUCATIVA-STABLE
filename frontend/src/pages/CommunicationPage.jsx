@@ -314,12 +314,12 @@ const CommunicationPage = () => {
             <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Centro de Comunicación</h1>
             {/* ... (Tabs) ... */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="flex border-b border-slate-200">
+                <div className="flex border-b border-slate-200 overflow-x-auto">
                     {['inbox', 'sent', 'notices', 'compose'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`flex-1 p-4 flex items-center justify-center gap-2 font-medium transition-colors ${activeTab === tab ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}
+                            className={`min-w-fit px-6 py-4 flex items-center justify-center gap-2 font-medium transition-colors whitespace-nowrap ${activeTab === tab ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50' : 'text-slate-500 hover:bg-slate-50'}`}
                         >
                             {tab === 'inbox' && <Inbox size={18} />}
                             {tab === 'sent' && <Send size={18} />}

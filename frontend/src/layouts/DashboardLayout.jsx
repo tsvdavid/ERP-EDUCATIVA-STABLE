@@ -29,7 +29,9 @@ import {
     Database,
     Wrench,
     FileCode,
-    RefreshCw
+    RefreshCw,
+    Menu,
+    X
 } from 'lucide-react';
 
 const DashboardLayout = () => {
@@ -39,6 +41,7 @@ const DashboardLayout = () => {
     const { lastMessage } = useSocket();
     const [unreadCount, setUnreadCount] = useState(0);
     const [institutions, setInstitutions] = useState([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Fetch institutions if Admin for Selector
     useEffect(() => {
@@ -152,9 +155,22 @@ const DashboardLayout = () => {
     }, [user, navItems]);
 
     return (
-        <div className="flex h-screen bg-slate-50">
-            {/* Sidebar Moderno */}
-            <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl relative z-20">
+        <div className="flex h-screen bg-slate-50 relative">
+            {/* Mobile Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            {/* Sidebar Responsive */}
+            <aside className={`
+                fixed inset-y-0 left-0 z-40
+                w-72 bg-slate-900 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
+                md:relative md:translate-x-0
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            `}>
                 <div className="p-6 flex items-center gap-3 border-b border-slate-800">
                     <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/30">
                         <GraduationCap size={24} className="text-white" />
@@ -163,6 +179,12 @@ const DashboardLayout = () => {
                         <h1 className="font-bold text-xl tracking-wide">EduERP</h1>
                         <p className="text-xs text-slate-400">Panel de Gestión</p>
                     </div>
+                    <button
+                        className="ml-auto md:hidden text-slate-400 hover:text-white"
+                        onClick={() => setIsSidebarOpen(false)}
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
 
                 <nav className="flex-1 px-4 py-6 space-y-6 overflow-y-auto">
@@ -181,6 +203,7 @@ const DashboardLayout = () => {
                                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50'
                                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
                                                 }`}
+                                            onClick={() => setIsSidebarOpen(false)} // Close on navigate (mobile)
                                         >
                                             <Icon size={20} className={active ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'} />
                                             <span className="font-medium">{item.label}</span>
@@ -205,32 +228,41 @@ const DashboardLayout = () => {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden w-full">
                 <Toaster position="top-right" />
                 {/* Modern Header */}
-                <header className="h-20 bg-white border-b border-slate-100 flex items-center justify-between px-8 shadow-sm relative z-10">
-                    {/* Search Bar */}
-                    <div className="flex items-center bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 w-96 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
-                        <Search size={18} className="text-slate-400 mr-3" />
-                        <input
-                            type="text"
-                            placeholder="Buscar cursos, estudiantes..."
-                            className="bg-transparent border-none focus:ring-0 text-sm w-full text-slate-600 placeholder:text-slate-400"
-                        />
+                <header className="h-16 md:h-20 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-8 shadow-sm relative z-10">
+                    {/* Mobile Toggle & Search */}
+                    <div className="flex items-center gap-4 flex-1">
+                        <button
+                            className="p-2 -ml-2 text-slate-500 md:hidden hover:bg-slate-50 rounded-lg"
+                            onClick={() => setIsSidebarOpen(true)}
+                        >
+                            <Menu size={24} />
+                        </button>
+
+                        <div className="hidden sm:flex items-center bg-slate-50 px-4 py-2 rounded-lg border border-slate-100 w-full max-w-md focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                            <Search size={18} className="text-slate-400 mr-3" />
+                            <input
+                                type="text"
+                                placeholder="Buscar..."
+                                className="bg-transparent border-none focus:ring-0 text-sm w-full text-slate-600 placeholder:text-slate-400"
+                            />
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 md:gap-6">
 
-                        {/* Institution Selector for Admin */}
+                        {/* Institution Selector for Admin - Mobile Optimized */}
                         {user?.role === 'ADMIN' && institutions.length > 0 && (
-                            <div className="relative">
+                            <div className="relative hidden sm:block">
                                 <Building size={16} className="absolute left-3 top-3 text-slate-400 pointer-events-none" />
                                 <select
-                                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 focus:ring-2 focus:ring-indigo-100 outline-none appearance-none cursor-pointer hover:bg-slate-100 transition-colors"
+                                    className="pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 focus:ring-2 focus:ring-indigo-100 outline-none appearance-none cursor-pointer hover:bg-slate-100 transition-colors max-w-[150px] md:max-w-xs truncate"
                                     value={activeInstitution || ""}
                                     onChange={handleInstitutionChange}
                                 >
-                                    <option value="">Todas las Instituciones</option>
+                                    <option value="">Todas</option>
                                     {institutions.map(inst => (
                                         <option key={inst.id} value={inst.id}>{inst.name}</option>
                                     ))}
@@ -245,7 +277,7 @@ const DashboardLayout = () => {
                             )}
                         </Link>
 
-                        <div className="flex items-center gap-3 pl-6 border-l border-slate-100">
+                        <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-slate-100">
                             <div className="text-right hidden md:block">
                                 <p className="text-sm font-semibold text-slate-800">{user?.username || 'Usuario'}</p>
                                 <p className="text-xs text-slate-500 capitalize">
@@ -262,7 +294,7 @@ const DashboardLayout = () => {
                                     })()}
                                 </p>
                             </div>
-                            <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white">
+                            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white">
                                 {user?.username?.charAt(0).toUpperCase()}
                             </div>
                         </div>
@@ -270,7 +302,7 @@ const DashboardLayout = () => {
                 </header>
 
                 {/* Content Scrollable */}
-                <main className="flex-1 overflow-y-auto bg-slate-50/50 p-8">
+                <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-8">
                     {/* Key forces remount on institution change to refresh data */}
                     <Outlet key={activeInstitution} />
                 </main>

@@ -7,7 +7,13 @@ const userService = {
             url += `?role=${role}`;
         }
         const response = await api.get(url);
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createUser: async (userData) => {
         const response = await api.post('/users/', userData);
@@ -25,7 +31,13 @@ const userService = {
     // Institutions
     getInstitutions: async () => {
         const response = await api.get('/users/institutions/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createInstitution: async (data) => {
         const response = await api.post('/users/institutions/', data);

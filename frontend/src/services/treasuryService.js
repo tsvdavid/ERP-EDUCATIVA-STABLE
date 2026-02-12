@@ -4,7 +4,13 @@ const treasuryService = {
     // Concepts
     getConcepts: async () => {
         const response = await api.get('/treasury/concepts/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     createConcept: async (data) => {
         const response = await api.post('/treasury/concepts/', data);
@@ -22,19 +28,37 @@ const treasuryService = {
     // Methods
     getMethods: async () => {
         const response = await api.get('/treasury/methods/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
 
     // Accounts
     getAccounts: async () => {
         const response = await api.get('/treasury/accounts/');
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
 
     // Invoices
     getInvoices: async (params) => {
         const response = await api.get('/treasury/invoices/', { params });
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
 
     // Process Payment
@@ -47,7 +71,13 @@ const treasuryService = {
     getCharges: async (params) => {
         // params: { student_id, pending: true/false }
         const response = await api.get('/treasury/charges/', { params });
-        return response.data;
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
     },
     generateCharges: async (data) => {
         const response = await api.post('/treasury/charges/generate-monthly/', data);

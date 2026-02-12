@@ -15,7 +15,9 @@ export const SocketProvider = ({ children }) => {
     useEffect(() => {
         if (isAuthenticated && token) {
             // Connect to WebSocket with token in query string
-            const wsUrl = `ws://localhost:8000/ws/notifications/?token=${token}`;
+            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+            const wsBase = apiUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
+            const wsUrl = `${wsBase}/ws/notifications/?token=${token}`;
             const socket = new WebSocket(wsUrl);
 
             socket.onopen = () => {

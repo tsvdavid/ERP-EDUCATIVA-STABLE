@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: 'http://127.0.0.1:8000/api', // Ajustar URL si es necesario
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
     headers: {
         // 'Content-Type': 'application/json', // Let axios set it automatically
     },
@@ -9,6 +9,11 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
+        // Fix for Axios baseURL with path component: strip leading slash from url
+        if (config.url && config.url.startsWith('/')) {
+            config.url = config.url.substring(1);
+        }
+
         const token = localStorage.getItem('access_token');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;

@@ -153,38 +153,38 @@ const ReportsPage = () => {
                             {renderAccountTree(data.assets)}
                             <div className="mt-4 pt-4 border-t-2 border-slate-800 flex justify-between font-bold text-lg">
                                 <span>TOTAL ACTIVOS</span>
-                                <span>${(data.total_assets || 0).toLocaleString()}</span>
+                                <span>${(data?.total_assets || 0).toLocaleString()}</span>
                             </div>
                         </div>
 
                         <div className="space-y-8">
                             <div>
                                 <h3 className="text-lg font-bold text-indigo-700 border-b border-indigo-200 pb-2 mb-4">PASIVOS</h3>
-                                {renderAccountTree(data.liabilities)}
+                                {renderAccountTree(data?.liabilities)}
                                 <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between font-bold">
                                     <span>Total Pasivos</span>
-                                    <span>${data.total_liabilities.toLocaleString()}</span>
+                                    <span>${(data?.total_liabilities || 0).toLocaleString()}</span>
                                 </div>
                             </div>
 
                             <div>
                                 <h3 className="text-lg font-bold text-indigo-700 border-b border-indigo-200 pb-2 mb-4">PATRIMONIO</h3>
-                                {renderAccountTree(data.equity)}
+                                {renderAccountTree(data?.equity)}
 
                                 <div className="flex justify-between py-2 text-green-700 font-medium">
                                     <span>Utilidad del Ejercicio</span>
-                                    <span>${data.net_income.toLocaleString()}</span>
+                                    <span>${(data?.net_income || 0).toLocaleString()}</span>
                                 </div>
 
                                 <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between font-bold">
                                     <span>Total Patrimonio</span>
-                                    <span>${(data.total_equity + data.net_income).toLocaleString()}</span>
+                                    <span>${((data?.total_equity || 0) + (data?.net_income || 0)).toLocaleString()}</span>
                                 </div>
                             </div>
 
                             <div className="mt-4 pt-4 border-t-2 border-slate-800 flex justify-between font-bold text-lg">
                                 <span>TOTAL PASIVO + PATRIMONIO</span>
-                                <span>${data.total_equity_and_liabilities.toLocaleString()}</span>
+                                <span>${(data?.total_equity_and_liabilities || 0).toLocaleString()}</span>
                             </div>
                         </div>
                     </div>

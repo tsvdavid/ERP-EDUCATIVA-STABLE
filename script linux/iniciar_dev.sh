@@ -95,6 +95,7 @@ fi
 
 # Iniciar servidor en segundo plano
 echo -e "${GREEN}[Frontend] Iniciando servidor en http://localhost:5173 ...${NC}"
+export VITE_API_URL="/api"
 npm run dev -- --host &
 FRONTEND_PID=$!
 

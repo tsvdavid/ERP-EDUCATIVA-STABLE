@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from .models import Account, FiscalYear, JournalEntry
 from .serializers import AccountSerializer, FiscalYearSerializer, JournalEntrySerializer
+from decimal import Decimal
 
 class AccountViewSet(viewsets.ModelViewSet):
     queryset = Account.objects.all()
@@ -159,7 +160,8 @@ class ReportViewSet(viewsets.ViewSet):
         accounts = Account.objects.filter(institution=institution, account_type=account_type).order_by('code')
         
         # Build Map
-        acc_map = {acc.id: {'id': acc.id, 'code': acc.code, 'name': acc.name, 'parent': acc.parent_id, 'children': [], 'balance': 0} for acc in accounts}
+        # Build Map
+        acc_map = {acc.id: {'id': acc.id, 'code': acc.code, 'name': acc.name, 'parent': acc.parent_id, 'children': [], 'balance': Decimal(0)} for acc in accounts}
         
         roots = []
         
@@ -173,9 +175,9 @@ class ReportViewSet(viewsets.ViewSet):
             credits = JournalItem.objects.filter(account=acc, journal_entry__state='POSTED').aggregate(Sum('credit'))['credit__sum'] or 0
             
             if account_type in ['ASSET', 'EXPENSE']:
-                node['balance'] = float(debits - credits)
+                node['balance'] = debits - credits
             else: # LIABILITY, EQUITY, INCOME
-                node['balance'] = float(credits - debits)
+                node['balance'] = credits - debits
 
         # 2. Build Tree and Aggregate up
         # We do this by iterating backwards by level (deepest first) or just naive recursion?
@@ -196,7 +198,7 @@ class ReportViewSet(viewsets.ViewSet):
         return roots
 
     def _propagate_balance(self, node):
-        child_total = 0
+        child_total = Decimal(0)
         for child in node['children']:
             self._propagate_balance(child)
             child_total += child['balance']
@@ -204,7 +206,7 @@ class ReportViewSet(viewsets.ViewSet):
         node['balance'] += child_total
 
     def _get_group_total(self, tree_nodes):
-        total = 0
+        total = Decimal(0)
         for node in tree_nodes:
             total += node['balance']
         return total

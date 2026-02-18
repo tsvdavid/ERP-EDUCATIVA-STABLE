@@ -16,6 +16,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['institution'] = user.institution.id if user.institution else None
         return token
 
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        return data
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 

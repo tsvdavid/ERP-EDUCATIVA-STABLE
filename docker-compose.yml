@@ -31,6 +31,7 @@ services:
 
   frontend:
     build: ./frontend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -39,6 +40,13 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - API_PROXY_TARGET=http://backend:8000
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
 
 volumes:
   db_data:

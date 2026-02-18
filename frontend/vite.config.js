@@ -7,6 +7,8 @@ export default defineConfig({
   server: {
     allowedHosts: true,
     host: true,
+    port: 5173,
+    strictPort: true,
     proxy: {
       '/api': {
         target: process.env.API_PROXY_TARGET || 'http://localhost:8000',

@@ -32,6 +32,8 @@ check_cmd() {
 
 check_cmd "python3"
 check_cmd "npm"
+check_cmd "psql"
+check_cmd "redis-cli"
 
 # Función para manejar el cierre (Ctrl+C)
 cleanup() {
@@ -76,9 +78,27 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo -e "${BLUE}Verificando backend/.env...${NC}"
+if [ ! -f ".env" ]; then
+    echo -e "${RED}⚠️ Creado backend/.env de ejemplo para desarrollo local...${NC}"
+    cat <<EOF > .env
+DEBUG=True
+SECRET_KEY=clave_secreta_local
+ALLOWED_HOSTS=*
+DB_NAME=erp_educativa
+DB_USER=postgres
+DB_PASSWORD=postgrespw
+DB_HOST=localhost
+REDIS_URL=redis://localhost:6379/0
+EOF
+fi
+
+echo -e "${BLUE}Ejecutando migraciones de Base de Datos...${NC}"
+python manage.py migrate
+
 # Iniciar servidor en segundo plano
-echo -e "${GREEN}[Backend] Iniciando servidor en http://localhost:8000 ...${NC}"
-python3 manage.py runserver 0.0.0.0:8000 &
+echo -e "${GREEN}[Backend] Iniciando daphne en http://0.0.0.0:8000 ...${NC}"
+daphne -b 0.0.0.0 -p 8000 config.asgi:application &
 BACKEND_PID=$!
 
 # --- 2. INICIAR FRONTEND ---
@@ -93,8 +113,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo -e "${BLUE}Verificando frontend/.env...${NC}"
+if [ ! -f ".env" ]; then
+    echo -e "${RED}⚠️ Creado frontend/.env de ejemplo...${NC}"
+    echo "VITE_API_URL=http://localhost:8000/api" > .env
+fi
+
 # Iniciar servidor en segundo plano
 echo -e "${GREEN}[Frontend] Iniciando servidor en http://localhost:5173 ...${NC}"
+# No necesitamos export VITE_API_URL si ya está en .env, pero lo dejamos por si acaso
 export VITE_API_URL="/api"
 npm run dev -- --host &
 FRONTEND_PID=$!

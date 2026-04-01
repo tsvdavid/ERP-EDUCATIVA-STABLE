@@ -8,7 +8,8 @@ from .views import (
     AttendanceViewSet,
     EvaluationCategoryViewSet,
     AcademicYearViewSet,
-    AcademicPeriodViewSet
+    AcademicPeriodViewSet,
+    ClassScheduleViewSet
 )
 
 router = DefaultRouter()
@@ -20,6 +21,7 @@ router.register(r'enrollments', EnrollmentViewSet)
 router.register(r'grades', GradeViewSet, basename='grade')
 router.register(r'attendance', AttendanceViewSet, basename='attendance')
 router.register(r'evaluation-categories', EvaluationCategoryViewSet)
+router.register(r'schedules', ClassScheduleViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

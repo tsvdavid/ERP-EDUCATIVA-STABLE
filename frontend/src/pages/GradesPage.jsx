@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import academicService from '../services/academicService';
-import { Plus, Filter, Save, X, Settings, Calculator, Download, MessageSquare } from 'lucide-react';
+import healthService from '../services/healthService';
+import { Plus, Filter, Save, X, Settings, Calculator, Download, MessageSquare, BarChart, FileText } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+import BehaviorQuickModal from '../components/BehaviorQuickModal';
 
 const GradesPage = () => {
     // Selection State
@@ -21,7 +25,11 @@ const GradesPage = () => {
     const [showCategoryModal, setShowCategoryModal] = useState(false);
 
     // Comment Editing State
-    const [editingComment, setEditingComment] = useState(null); // { enrollmentId, categoryId, gradeId, text }
+    const [editingComment, setEditingComment] = useState(null);
+
+    const [showBehaviorModal, setShowBehaviorModal] = useState(false);
+    const [todayBehaviors, setTodayBehaviors] = useState({});
+    const [selectedBehaviorStudent, setSelectedBehaviorStudent] = useState(null);
 
     // Category Form
     const [categoryForm, setCategoryForm] = useState({ id: null, subject: '', name: '', weight: '' });
@@ -83,6 +91,11 @@ const GradesPage = () => {
         } finally {
             setLoadingGrid(false);
         }
+    };
+
+    const openBehaviorModal = (studentId, studentName) => {
+        setSelectedBehaviorStudent({ id: studentId, fullName: studentName });
+        setShowBehaviorModal(true);
     };
 
     // Helper to find existing grade
@@ -222,6 +235,48 @@ const GradesPage = () => {
         if (!selectedCourse) return [];
         return subjects.filter(s => s.course === parseInt(selectedCourse));
     }, [selectedCourse, subjects]);
+    
+    // Grading Info
+    const selectedCourseData = useMemo(() => {
+        return courses.find(c => c.id === parseInt(selectedCourse));
+    }, [selectedCourse, courses]);
+
+    const selectedSubjectData = useMemo(() => {
+        return subjects.find(s => s.id === parseInt(selectedSubject));
+    }, [selectedSubject, subjects]);
+
+    const effectiveGradingType = useMemo(() => {
+        if (!selectedSubjectData || !selectedCourseData) return 'QUANTITATIVE';
+        if (selectedSubjectData.grading_type && selectedSubjectData.grading_type !== 'INHERIT') {
+            return selectedSubjectData.grading_type;
+        }
+        return selectedCourseData.grading_type || 'QUANTITATIVE';
+    }, [selectedSubjectData, selectedCourseData]);
+
+    const isQualitative = effectiveGradingType !== 'QUANTITATIVE';
+
+    const getQualitativeGrade = (score, scaleType = 'QUALITATIVE_DESTREZAS') => {
+        if (score === null || score === undefined || score === '' || isNaN(score)) return '-';
+        const num = parseFloat(score);
+        
+        if (scaleType === 'QUALITATIVE_PROYECTOS') {
+            if (num >= 9) return 'EX';
+            if (num >= 7) return 'MB';
+            if (num >= 5) return 'B';
+            return 'R';
+        } else if (scaleType === 'QUALITATIVE_COMPORTAMIENTO') {
+            if (num >= 9) return 'A';
+            if (num >= 7) return 'B';
+            if (num >= 5) return 'C';
+            if (num >= 4) return 'D';
+            return 'E';
+        } else {
+            if (num >= 9) return 'DA';
+            if (num >= 7) return 'EP';
+            if (num >= 5) return 'I';
+            return 'NE';
+        }
+    };
 
 
     // Category Management Handlers
@@ -258,7 +313,12 @@ const GradesPage = () => {
             {/* Header & Controls */}
             <div className="flex flex-col md:flex-row justify-between items-start gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Libro de Calificaciones</h1>
+                    <div className="flex items-center gap-4 mb-1">
+                        <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Libro de Calificaciones</h1>
+                        <Link to="/dashboard/academic/reports" className="flex items-center gap-1 text-sm bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full font-medium hover:bg-indigo-100 transition-colors">
+                            <BarChart size={16} /> Ver Reportes
+                        </Link>
+                    </div>
                     <p className="text-slate-500 mt-1">Seleccione curso y materia para gestionar notas en tiempo real.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
@@ -346,6 +406,7 @@ const GradesPage = () => {
                                                 <th className="p-4 border-b border-slate-200 text-center min-w-[100px]">Trimestre 2</th>
                                                 <th className="p-4 border-b border-slate-200 text-center min-w-[100px]">Trimestre 3</th>
                                                 <th className="p-4 border-b border-l border-slate-200 text-center min-w-[100px] bg-indigo-50 font-bold text-indigo-700">Nota Final</th>
+                                                <th className="p-4 border-b border-l border-slate-200 text-center min-w-[80px]">Conducta</th>
                                             </>
                                         ) : (
                                             <>
@@ -358,6 +419,7 @@ const GradesPage = () => {
                                                     </th>
                                                 ))}
                                                 <th className="p-4 border-b border-l border-slate-200 text-center min-w-[100px] bg-slate-50 font-bold text-slate-700">Promedio</th>
+                                                <th className="p-4 border-b border-l border-slate-200 text-center min-w-[80px]">Conducta</th>
                                             </>
                                         )}
                                     </tr>
@@ -378,10 +440,15 @@ const GradesPage = () => {
                                                     </td>
                                                     {selectedTrimester === 'summary' ? (
                                                         <>
-                                                            <td className="p-4 text-center border-r border-slate-100">{globalData.t1}</td>
-                                                            <td className="p-4 text-center border-r border-slate-100">{globalData.t2}</td>
-                                                            <td className="p-4 text-center border-r border-slate-100">{globalData.t3}</td>
-                                                            <td className="p-4 border-l border-slate-200 text-center font-bold text-indigo-800 bg-indigo-50/30">{globalData.final}</td>
+                                                            <td className="p-4 text-center border-r border-slate-100">{isQualitative ? getQualitativeGrade(globalData.t1, effectiveGradingType) : globalData.t1}</td>
+                                                            <td className="p-4 text-center border-r border-slate-100">{isQualitative ? getQualitativeGrade(globalData.t2, effectiveGradingType) : globalData.t2}</td>
+                                                            <td className="p-4 text-center border-r border-slate-100">{isQualitative ? getQualitativeGrade(globalData.t3, effectiveGradingType) : globalData.t3}</td>
+                                                            <td className="p-4 border-l border-slate-200 text-center font-bold text-indigo-800 bg-indigo-50/30">{isQualitative ? getQualitativeGrade(globalData.final, effectiveGradingType) : globalData.final}</td>
+                                                            <td className="p-4 border-l border-slate-200 text-center">
+                                                                <button onClick={() => openBehaviorModal(studentEnrollment.student, "Estudiante", todayBehaviors[studentEnrollment.student])} className="p-1 bg-indigo-50 rounded transition-colors" title={todayBehaviors[studentEnrollment.student] ? "Añadir Observación Adicional" : "Registrar Conducta"}>
+    {todayBehaviors[studentEnrollment.student] ? <CheckCircle size={16} className="text-emerald-500" /> : <FileText size={16} className="text-indigo-500 hover:text-indigo-800" />}
+</button>
+                                                            </td>
                                                         </>
                                                     ) : (
                                                         <>
@@ -389,35 +456,47 @@ const GradesPage = () => {
                                                                 const obs = getGradeObservation(studentEnrollment.id, cat.id);
                                                                 return (
                                                                     <td key={cat.id} className="p-2 text-center border-r border-slate-50 relative group/cell">
-                                                                        <div className="relative flex items-center justify-center gap-1">
-                                                                            <input
-                                                                                type="number"
-                                                                                min="0"
-                                                                                max="10"
-                                                                                step="0.01"
-                                                                                className="w-16 text-center p-2 rounded-md border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all bg-transparent focus:bg-white font-medium text-slate-700"
-                                                                                placeholder="-"
-                                                                                defaultValue={getGradeValue(studentEnrollment.id, cat.id)}
-                                                                                onBlur={(e) => saveGrade(studentEnrollment.id, cat.id, e.target.value)}
-                                                                                onKeyDown={(e) => {
-                                                                                    if (e.key === 'Enter') {
-                                                                                        e.target.blur();
-                                                                                    }
-                                                                                }}
-                                                                            />
-                                                                            <button
-                                                                                onClick={() => handleOpenComment(studentEnrollment.id, cat.id)}
-                                                                                className={`p-1 rounded-full transition-colors ${obs ? 'text-indigo-500 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-300 hover:text-slate-500 opacity-0 group-hover/cell:opacity-100'}`}
-                                                                                title={obs || "Agregar comentario/detalle"}
-                                                                            >
-                                                                                <MessageSquare size={14} fill={obs ? "currentColor" : "none"} />
-                                                                            </button>
+                                                                        <div className="relative flex flex-col items-center justify-center gap-1">
+                                                                            <div className="flex items-center gap-1">
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="0"
+                                                                                    max="10"
+                                                                                    step="0.01"
+                                                                                    className="w-16 text-center p-2 rounded-md border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all bg-transparent focus:bg-white font-medium text-slate-700"
+                                                                                    placeholder="-"
+                                                                                    defaultValue={getGradeValue(studentEnrollment.id, cat.id)}
+                                                                                    onBlur={(e) => saveGrade(studentEnrollment.id, cat.id, e.target.value)}
+                                                                                    onKeyDown={(e) => {
+                                                                                        if (e.key === 'Enter') {
+                                                                                            e.target.blur();
+                                                                                        }
+                                                                                    }}
+                                                                                />
+                                                                                <button
+                                                                                    onClick={() => handleOpenComment(studentEnrollment.id, cat.id)}
+                                                                                    className={`p-1 rounded-full transition-colors ${obs ? 'text-indigo-500 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-300 hover:text-slate-500 opacity-0 group-hover/cell:opacity-100'}`}
+                                                                                    title={obs || "Agregar comentario/detalle"}
+                                                                                >
+                                                                                    <MessageSquare size={14} fill={obs ? "currentColor" : "none"} />
+                                                                                </button>
+                                                                            </div>
+                                                                            {isQualitative && getGradeValue(studentEnrollment.id, cat.id) !== '' && (
+                                                                                <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 rounded-sm">
+                                                                                    {getQualitativeGrade(getGradeValue(studentEnrollment.id, cat.id), effectiveGradingType)}
+                                                                                </span>
+                                                                            )}
                                                                         </div>
                                                                     </td>
                                                                 );
                                                             })}
                                                             <td className="p-4 border-l border-slate-200 text-center font-bold text-slate-800 bg-slate-50/30">
-                                                                {calculateFinalScore(studentEnrollment.id)}
+                                                                {isQualitative ? getQualitativeGrade(calculateFinalScore(studentEnrollment.id), effectiveGradingType) : calculateFinalScore(studentEnrollment.id)}
+                                                            </td>
+                                                            <td className="p-4 border-l border-slate-200 text-center">
+                                                                <button onClick={() => openBehaviorModal(studentEnrollment.student, "Estudiante", todayBehaviors[studentEnrollment.student])} className="p-1 bg-indigo-50 rounded transition-colors" title={todayBehaviors[studentEnrollment.student] ? "Añadir Observación Adicional" : "Registrar Conducta"}>
+    {todayBehaviors[studentEnrollment.student] ? <CheckCircle size={16} className="text-emerald-500" /> : <FileText size={16} className="text-indigo-500 hover:text-indigo-800" />}
+</button>
                                                             </td>
                                                         </>
                                                     )}
@@ -511,6 +590,18 @@ const GradesPage = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {showBehaviorModal && selectedBehaviorStudent && (
+                <BehaviorQuickModal
+                    existingRecord={selectedBehaviorStudent.existingRecord}
+                    studentId={selectedBehaviorStudent.id}
+                    studentName={selectedBehaviorStudent.fullName}
+                    courseId={selectedCourse}
+                    allowedTypes={['ACADEMIC']}
+                    subjectId={selectedSubject}
+                    onSaved={(result) => { if(result && result.student) { setTodayBehaviors(prev => ({...prev, [result.student]: result})); } loadGradebookData(); }}
+                    onClose={() => { setShowBehaviorModal(false); setSelectedBehaviorStudent(null); }}
+                />
             )}
         </div>
     );

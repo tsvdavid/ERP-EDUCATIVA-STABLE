@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import academicService from '../services/academicService';
-import { Calendar, Save, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import healthService from '../services/healthService';
+import { Calendar, Save, CheckCircle, XCircle, Clock, AlertTriangle, BarChart, FileText } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
+import BehaviorQuickModal from '../components/BehaviorQuickModal';
 
 const AttendancePage = () => {
     const [courses, setCourses] = useState([]);
@@ -10,6 +13,9 @@ const AttendancePage = () => {
     const [students, setStudents] = useState([]);
     const [attendanceMap, setAttendanceMap] = useState({}); // { studentId: { status, id (if exists), remarks } }
     const [loading, setLoading] = useState(false);
+    const [showBehaviorModal, setShowBehaviorModal] = useState(false);
+    const [todayBehaviors, setTodayBehaviors] = useState({});
+    const [selectedStudentForBehavior, setSelectedStudentForBehavior] = useState(null);
 
     useEffect(() => {
         loadCourses();
@@ -36,6 +42,13 @@ const AttendancePage = () => {
     const loadAttendanceData = async () => {
         setLoading(true);
         try {
+            try {
+                const behaviorRes = await healthService.getBehaviorRecords({ course: selectedCourse, date: selectedDate });
+                const bMap = {};
+                const records = behaviorRes.results || behaviorRes;
+                records.forEach(r => { bMap[r.student] = r; });
+                setTodayBehaviors(bMap);
+            } catch (err) { console.error("Behavior Error", err); }
             // 1. Get Enrollments (Students for this course)
             // We need a way to filter enrollments by course. 
             // The current getEnrollments returns ALL. We should probably filter on client or backend.
@@ -84,6 +97,11 @@ const AttendancePage = () => {
             ...prev,
             [enrollmentId]: { ...prev[enrollmentId], status: newStatus }
         }));
+    };
+
+    const openBehaviorModal = (studentId, studentName) => {
+        setSelectedStudentForBehavior({ id: studentId, fullName: studentName });
+        setShowBehaviorModal(true);
     };
 
     const markAll = (status) => {
@@ -146,7 +164,12 @@ const AttendancePage = () => {
                     <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                         <Calendar className="text-indigo-600" /> Control de Asistencia
                     </h1>
-                    <p className="text-slate-500">Registra y gestiona la asistencia diaria.</p>
+                    <div className="flex items-center gap-3 mt-1">
+                        <p className="text-slate-500">Registra y gestiona la asistencia diaria.</p>
+                        <Link to="/dashboard/academic/reports" className="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1 bg-indigo-50 px-3 py-1 rounded-full transition-colors hidden sm:flex">
+                            <BarChart size={14} /> Tablero de Estadísticas
+                        </Link>
+                    </div>
                 </div>
                 {students.length > 0 && (
                     <button
@@ -205,6 +228,7 @@ const AttendancePage = () => {
                                     <th className="p-4">Estudiante</th>
                                     <th className="p-4 text-center">Estado</th>
                                     <th className="p-4">Observación</th>
+                                    <th className="p-4 text-center">Conducta</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -232,7 +256,7 @@ const AttendancePage = () => {
                                                 </div>
                                                 <div className="text-center mt-1">
                                                     <span className={`text-[10px] font-bold uppercase tracking-wider ${state.status === 'PENDING' ? 'text-slate-300' :
-                                                            STATUS_OPTIONS.find(o => o.value === state.status)?.color
+                                                        STATUS_OPTIONS.find(o => o.value === state.status)?.color
                                                         }`}>
                                                         {state.status === 'PENDING' ? 'Sin Registro' : STATUS_OPTIONS.find(o => o.value === state.status)?.label}
                                                     </span>
@@ -250,6 +274,15 @@ const AttendancePage = () => {
                                                     }))}
                                                 />
                                             </td>
+                                            <td className="p-4 text-center">
+                                                <button
+                                                    onClick={() => openBehaviorModal(student.student, state.studentName, todayBehaviors[student.student])}
+                                                    className="p-2 hover:bg-indigo-50 rounded-lg transition-colors inline-block"
+                                                    title={todayBehaviors[student.student] ? "Añadir a la Conducta" : "Registro Rápido de Conducta"}
+                                                >
+                                                    {todayBehaviors[student.student] ? <CheckCircle size={20} className="inline text-emerald-500" /> : <FileText size={20} className="inline text-indigo-400 hover:text-indigo-600" />}
+                                                </button>
+                                            </td>
                                         </tr>
                                     );
                                 })}
@@ -261,6 +294,19 @@ const AttendancePage = () => {
                 <div className="p-10 text-center bg-slate-50 rounded-xl border border-dashed border-slate-300 text-slate-400">
                     Selecciona un curso para comenzar a tomar asistencia.
                 </div>
+            )}
+
+            {/* Modal de Conducta */}
+            {showBehaviorModal && selectedStudentForBehavior && (
+                <BehaviorQuickModal
+                    existingRecord={selectedStudentForBehavior.existingRecord}
+                    allowedTypes={['POSITIVE', 'NEGATIVE']}
+                    studentId={selectedStudentForBehavior.id}
+                    studentName={selectedStudentForBehavior.fullName}
+                    courseId={selectedCourse}
+                    onSaved={(result) => { if(result && result.student) { setTodayBehaviors(prev => ({...prev, [result.student]: result})); } loadAttendanceData(); }}
+                    onClose={() => { setShowBehaviorModal(false); setSelectedStudentForBehavior(null); }}
+                />
             )}
         </div>
     );

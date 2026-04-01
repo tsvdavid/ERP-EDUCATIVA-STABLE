@@ -61,6 +61,12 @@ INSTALLED_APPS = [
     'helpdesk',
     'privacy',
     'maintenance',
+    'payments',
+    'procedures',
+    'learning',
+    'knowledge',
+    'ai',
+    'health',
 ]
 
 MIDDLEWARE = [

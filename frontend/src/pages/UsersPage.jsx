@@ -30,6 +30,10 @@ const UsersPage = () => {
         phone: '',
         address: '',
         birth_date: '',
+        gender: '',
+        nationality: 'Ecuatoriana',
+        civil_status: '',
+        notes: '',
         photo: null,
         institution: activeInstitution || ''
     };
@@ -105,6 +109,10 @@ const UsersPage = () => {
             if (formData.second_surname) data.append('second_surname', formData.second_surname);
             if (formData.cedula) data.append('cedula', formData.cedula);
             if (formData.birth_date) data.append('birth_date', formData.birth_date);
+            if (formData.gender) data.append('gender', formData.gender);
+            if (formData.nationality) data.append('nationality', formData.nationality);
+            if (formData.civil_status) data.append('civil_status', formData.civil_status);
+            if (formData.notes) data.append('notes', formData.notes);
             if (formData.phone) data.append('phone', formData.phone);
             if (formData.address) data.append('address', formData.address);
 
@@ -167,6 +175,10 @@ const UsersPage = () => {
             phone: user.phone || '',
             address: user.address || '',
             birth_date: user.birth_date || '',
+            gender: user.gender || '',
+            nationality: user.nationality || 'Ecuatoriana',
+            civil_status: user.civil_status || '',
+            notes: user.notes || '',
             photo: null,
             institution: user.institution || ''
         });
@@ -194,10 +206,14 @@ const UsersPage = () => {
     const getRoleBadge = (role) => {
         const styles = {
             'ADMIN': 'bg-purple-100 text-purple-700',
+            'LOCAL_ADMIN': 'bg-fuchsia-100 text-fuchsia-700',
+            'ACCOUNTANT': 'bg-emerald-100 text-emerald-700',
             'RECTOR': 'bg-pink-100 text-pink-700',
             'TEACHER': 'bg-blue-100 text-blue-700',
             'PARENT': 'bg-orange-100 text-orange-700',
             'STUDENT': 'bg-green-100 text-green-700',
+            'DECE': 'bg-teal-100 text-teal-700',
+            'MEDICO': 'bg-cyan-100 text-cyan-700',
         };
         return styles[role] || 'bg-slate-100 text-slate-700';
     };
@@ -205,10 +221,14 @@ const UsersPage = () => {
     const getRoleName = (role) => {
         const names = {
             'ADMIN': 'Administrador',
+            'LOCAL_ADMIN': 'Administrador Local',
+            'ACCOUNTANT': 'Contabilidad',
             'RECTOR': 'Rector/Supervisor',
             'TEACHER': 'Profesor',
             'PARENT': 'Padre',
             'STUDENT': 'Estudiante',
+            'DECE': 'Consejero DECE',
+            'MEDICO': 'Médico Dispensario',
         };
         return names[role] || role;
     };
@@ -250,11 +270,15 @@ const UsersPage = () => {
                         onChange={(e) => setRoleFilter(e.target.value)}
                     >
                         <option value="ALL">Todos los Roles</option>
-                        <option value="ADMIN">Administrador</option>
-                        <option value="RECTOR">Supervisor</option>
+                        <option value="ADMIN">Administrador Superior</option>
+                        <option value="LOCAL_ADMIN">Administrador Local</option>
+                        <option value="ACCOUNTANT">Contabilidad</option>
+                        <option value="RECTOR">Supervisor/Rector</option>
                         <option value="TEACHER">Profesor</option>
-                        <option value="PARENT">Padre</option>
+                        <option value="PARENT">Padre/Representante</option>
                         <option value="STUDENT">Estudiante</option>
+                        <option value="DECE">Consejero DECE</option>
+                        <option value="MEDICO">Médico</option>
                     </select>
                 </div>
             </div>
@@ -341,6 +365,7 @@ const UsersPage = () => {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Información Personal</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Campos Básicos */}
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Primer Nombre</label>
                                         <input type="text" required className="input-modern w-full" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value })} />
@@ -360,6 +385,29 @@ const UsersPage = () => {
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Cédula</label>
                                         <input type="text" className="input-modern w-full" value={formData.cedula} onChange={(e) => setFormData({ ...formData, cedula: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Sexo</label>
+                                        <select className="input-modern w-full" value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
+                                            <option value="">Seleccione...</option>
+                                            <option value="M">Masculino</option>
+                                            <option value="F">Femenino</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Nacionalidad</label>
+                                        <input type="text" className="input-modern w-full" value={formData.nationality} onChange={(e) => setFormData({ ...formData, nationality: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Estado Civil</label>
+                                        <select className="input-modern w-full" value={formData.civil_status} onChange={e => setFormData({ ...formData, civil_status: e.target.value })}>
+                                            <option value="">Seleccione...</option>
+                                            <option value="SOLTERO">Soltero/a</option>
+                                            <option value="CASADO">Casado/a</option>
+                                            <option value="DIVORCIADO">Divorciado/a</option>
+                                            <option value="VIUDO">Viudo/a</option>
+                                            <option value="UNION_LIBRE">Unión Libre</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Nacimiento</label>
@@ -385,8 +433,13 @@ const UsersPage = () => {
                                         <select className="input-modern w-full" value={formData.role} onChange={(e) => setFormData({ ...formData, role: e.target.value })}>
                                             <option value="STUDENT">Estudiante</option>
                                             <option value="TEACHER">Profesor</option>
+                                            <option value="PARENT">Padre/Representante</option>
+                                            <option value="DECE">Consejero DECE</option>
+                                            <option value="MEDICO">Médico Dispensario</option>
+                                            <option value="ACCOUNTANT">Contabilidad</option>
                                             <option value="RECTOR">Supervisor/Rector</option>
-                                            {user?.role === 'ADMIN' && <option value="ADMIN">Administrador</option>}
+                                            {(user?.role === 'ADMIN' || user?.role === 'LOCAL_ADMIN') && <option value="LOCAL_ADMIN">Administrador Local</option>}
+                                            {user?.role === 'ADMIN' && <option value="ADMIN">Administrador Superior</option>}
                                         </select>
                                     </div>
                                     <div>
@@ -429,6 +482,10 @@ const UsersPage = () => {
                                 <div className="mt-4">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
                                     <textarea rows="2" className="input-modern w-full" value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })}></textarea>
+                                </div>
+                                <div className="mt-4">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
+                                    <textarea rows="2" className="input-modern w-full" value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })}></textarea>
                                 </div>
                             </div>
 

@@ -5,6 +5,7 @@ const SuppliersPage = () => {
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [viewingSupplier, setViewingSupplier] = useState(null);
     const [editingSupplier, setEditingSupplier] = useState(null);
     const [formData, setFormData] = useState({
         tax_id: '',
@@ -93,8 +94,8 @@ const SuppliersPage = () => {
             {loading ? (
                 <div>Cargando...</div>
             ) : (
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
+                <div className="bg-white rounded-lg shadow overflow-x-auto">
+                    <table className="min-w-[800px] sm:min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identificación</th>
@@ -110,6 +111,7 @@ const SuppliersPage = () => {
                                     <td className="px-6 py-4 whitespace-nowrap">{sup.legal_name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{sup.trade_name}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <button onClick={() => setViewingSupplier(sup)} className="text-blue-600 hover:text-blue-900 mr-4">Ver</button>
                                         <button onClick={() => handleEdit(sup)} className="text-indigo-600 hover:text-indigo-900 mr-4">Editar</button>
                                         <button onClick={() => handleDelete(sup.id)} className="text-red-600 hover:text-red-900">Eliminar</button>
                                     </td>
@@ -120,7 +122,52 @@ const SuppliersPage = () => {
                 </div>
             )}
 
-            {/* Modal */}
+            {/* View Modal */}
+            {viewingSupplier && (
+                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
+                        <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                            <h2 className="text-xl font-bold text-gray-800">Detalles del Proveedor</h2>
+                            <button onClick={() => setViewingSupplier(null)} className="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-md">
+                                <div>
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Razón Social</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.legal_name}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Nombre Comercial</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.trade_name || '-'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Identificación</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.tax_id} ({viewingSupplier.tax_id_type})</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Email</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.email || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Dirección</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.address || '-'}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">Teléfono</p>
+                                    <p className="text-sm font-medium text-gray-900">{viewingSupplier.phone || '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                            <button onClick={() => setViewingSupplier(null)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200">
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Form Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
                     <div className="bg-white p-8 rounded-md shadow-xl w-96">

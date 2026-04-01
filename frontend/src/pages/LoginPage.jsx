@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../context/authStore';
 import { useNavigate } from 'react-router-dom';
 import { Lock, User, BookOpen } from 'lucide-react';
+import logoEduka360 from '../assets/logo-eduka360.jpg';
 
 const LoginPage = () => {
     const [username, setUsername] = useState('');
@@ -39,12 +40,10 @@ const LoginPage = () => {
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
             <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
-                <div className="bg-primary p-8 text-center">
-                    <div className="mx-auto bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
-                        <BookOpen className="w-8 h-8 text-white" />
+                <div className="bg-primary p-8 text-center flex flex-col items-center justify-center">
+                    <div className="w-full max-w-[280px] h-24 flex items-center justify-center mb-2">
+                        <img src={logoEduka360} alt="Eduka360 Logo" className="w-full h-full object-contain" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white mb-2">ERP Educativa</h2>
-                    <p className="text-blue-100">Sistema de Gestión Institucional</p>
                 </div>
 
                 <div className="p-8">
@@ -92,7 +91,7 @@ const LoginPage = () => {
                         <button
                             type="submit"
                             disabled={isLoading}
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors disabled:opacity-50"
+                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white bg-primary hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200 disabled:opacity-50 transform hover:-translate-y-0.5 active:translate-y-0"
                         >
                             {isLoading ? 'Iniciando sesión...' : 'Ingresar al Sistema'}
                         </button>
@@ -100,7 +99,7 @@ const LoginPage = () => {
                 </div>
 
                 <div className="bg-gray-50 px-8 py-4 text-center text-xs text-gray-500">
-                    &copy; 2026 ERP Educativa. Todos los derechos reservados.
+                    &copy; 2026 Eduka360. Todos los derechos reservados.
                 </div>
             </div>
         </div>

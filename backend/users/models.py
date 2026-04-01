@@ -41,8 +41,12 @@ class Institution(models.Model):
 class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = 'ADMIN', _('Administrador')
+        LOCAL_ADMIN = 'LOCAL_ADMIN', _('Administrador Local')
+        ACCOUNTANT = 'ACCOUNTANT', _('Auditor Contable')
         RECTOR = 'RECTOR', _('Rector/Supervisor')
         TEACHER = 'TEACHER', _('Profesor')
+        DECE = 'DECE', _('Consejero DECE')
+        MEDICO = 'MEDICO', _('Médico Dispensario')
         PARENT = 'PARENT', _('Padre/Representante')
         STUDENT = 'STUDENT', _('Estudiante')
 
@@ -84,8 +88,28 @@ class User(AbstractUser):
     photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     notes = models.TextField(blank=True, null=True)
 
+    # New Demographics & Professional Info
+    nationality = models.CharField(max_length=50, blank=True, default='Ecuatoriana')
+    civil_status = models.CharField(
+        max_length=20,
+        choices=[('SOLTERO', 'Soltero/a'), ('CASADO', 'Casado/a'), ('DIVORCIADO', 'Divorciado/a'), ('VIUDO', 'Viudo/a'), ('UNION_LIBRE', 'Unión Libre')],
+        blank=True,
+        default=''
+    )
+    titles = models.TextField(blank=True, default='', help_text="Títulos profesionales y masterados")
+    teaching_category = models.CharField(
+        max_length=2,
+        choices=[('A', 'Categoría A'), ('B', 'Categoría B'), ('C', 'Categoría C'), ('D', 'Categoría D'), ('E', 'Categoría E'), ('F', 'Categoría F'), ('G', 'Categoría G'), ('H', 'Categoría H'), ('I', 'Categoría I'), ('J', 'Categoría J')],
+        blank=True,
+        default=''
+    )
+
     # Contact Fields
     representative_name = models.CharField(max_length=255, blank=True, default='')
+    representative_cedula = models.CharField(max_length=20, blank=True, default='')
+    representative_email = models.EmailField(blank=True, default='')
+    representative_address = models.TextField(blank=True, default='')
+    use_representative_for_billing = models.BooleanField(default=False)
     secondary_phone = models.CharField(max_length=20, blank=True, default='')
     
     # Evitar conflictos con auth.User

@@ -3,7 +3,9 @@ import { useAuthStore } from '../context/authStore';
 import userService from '../services/userService';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
-import { Users, GraduationCap, Calendar, AlertTriangle, ChevronRight, Activity } from 'lucide-react';
+import { Users, GraduationCap, Calendar, AlertTriangle, ChevronRight, Activity, DollarSign, AlertCircle } from 'lucide-react';
+import treasuryService from '../services/treasuryService';
+import CheckoutModal from '../components/payments/CheckoutModal';
 
 const ParentDashboard = () => {
     const { user } = useAuthStore();
@@ -11,7 +13,11 @@ const ParentDashboard = () => {
     const [children, setChildren] = useState([]);
     const [selectedChild, setSelectedChild] = useState(null);
     const [stats, setStats] = useState({ average: 0, attendance: 0, alerts: 0 });
+    const [charges, setCharges] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [verifyingPayments, setVerifyingPayments] = useState([]);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [cartPayload, setCartPayload] = useState(null);
 
     useEffect(() => {
         // Load children from user profile (assuming populated in authStore or fetch fresh)
@@ -59,13 +65,19 @@ const ParentDashboard = () => {
         // In a real app, these would be aggregated endpoints.
         // For MVP, we fetch raw lists and calculate.
         try {
-            const [gradesRes, attendanceRes] = await Promise.all([
+            const [gradesRes, attendanceRes, chargesList, paymentsRes] = await Promise.all([
                 api.get(`/academic/grades/?student_id=${studentId}`),
-                api.get(`/academic/attendance/?student_id=${studentId}`)
+                api.get(`/academic/attendance/?student_id=${studentId}`),
+                treasuryService.getCharges({ student_id: studentId, pending: 'true' }),
+                api.get('/payments/')
             ]);
 
             const grades = gradesRes.data;
             const attendance = attendanceRes.data;
+            const allTxns = paymentsRes.data || [];
+
+            const verifyingTxns = allTxns.filter(t => t.status === 'VERIFYING');
+            setVerifyingPayments(verifyingTxns);
 
             // Calculate Average
             const totalScore = grades.reduce((acc, curr) => acc + parseFloat(curr.score), 0);
@@ -86,8 +98,35 @@ const ParentDashboard = () => {
                 attendance: attendancePct,
                 alerts: alrts
             });
+            setCharges(chargesList || []);
         } catch (error) {
             console.error("Error loading stats", error);
+        }
+    };
+
+    const handlePayDebt = (charge) => {
+        const payload = {
+            student_id: selectedChild.id,
+            amount: parseFloat(charge.amount),
+            currency: 'USD',
+            description: `Pago de: ${charge.concept_detail?.name || 'Deuda'}`,
+            reference_id: charge.id,
+            concepts: [
+                {
+                    concept_id: charge.concept_detail?.id,
+                    quantity: 1,
+                    charge_id: charge.id
+                }
+            ]
+        };
+        setCartPayload(payload);
+        setIsCheckoutOpen(true);
+    };
+
+    const onPaymentSuccess = () => {
+        setIsCheckoutOpen(false);
+        if (selectedChild) {
+            loadChildStats(selectedChild.id);
         }
     };
 
@@ -134,6 +173,65 @@ const ParentDashboard = () => {
             {/* Selected Child Content */}
             {selectedChild && (
                 <>
+                    {/* Admin / My Account Section */}
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+                        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                            <div className="flex items-center gap-2">
+                                <DollarSign size={18} className="text-indigo-600" />
+                                <h3 className="font-semibold text-slate-700">Administrativo / Mi Cuenta</h3>
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            {charges.length === 0 ? (
+                                <p className="text-slate-500 italic text-sm">El estudiante está al día. No hay facturas o deudas pendientes en este momento.</p>
+                            ) : (
+                                charges.map(charge => (
+                                    <div key={charge.id} className="flex flex-col md:flex-row md:justify-between md:items-center bg-white p-4 rounded-lg border border-red-100 shadow-sm gap-4 md:gap-0">
+                                        <div>
+                                            <p className="font-bold text-slate-800">{charge.concept_detail?.name || 'Deuda'}</p>
+                                            <p className="text-sm text-red-500">Vence: {charge.due_date}</p>
+                                        </div>
+                                        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+                                            <span className="font-bold text-slate-700 text-lg">${parseFloat(charge.amount).toFixed(2)}</span>
+                                            <button
+                                                onClick={() => handlePayDebt(charge)}
+                                                className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg shadow-indigo-200"
+                                            >
+                                                <DollarSign size={18} /> Pagar Ahora
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Verifying Payments Section */}
+                    {verifyingPayments.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border border-orange-100 overflow-hidden mb-6">
+                            <div className="p-4 border-b border-orange-100 flex items-center gap-2 bg-orange-50/50">
+                                <AlertCircle className="text-orange-500" size={18} />
+                                <h3 className="font-semibold text-slate-800">Pagos en Verificación</h3>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                {verifyingPayments.map(txn => (
+                                    <div key={txn.id} className="flex flex-col md:flex-row md:justify-between md:items-center bg-white p-4 rounded-lg border border-orange-100 shadow-sm gap-4 md:gap-0 hover:bg-orange-50 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-slate-800">{txn.description || 'Transferencia Bancaria'}</p>
+                                            <p className="text-sm text-orange-500 flex items-center gap-1">Ref: {txn.reference_id}</p>
+                                        </div>
+                                        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+                                            <span className="font-bold text-slate-700 text-lg">${parseFloat(txn.amount).toFixed(2)}</span>
+                                            <span className="px-4 py-1.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold uppercase tracking-wide">
+                                                En Revisión
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Stats Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center gap-4">
@@ -218,6 +316,16 @@ const ParentDashboard = () => {
                             </div>
                         </div>
                     </div>
+
+                    {/* Payment Modal */}
+                    {cartPayload && (
+                        <CheckoutModal
+                            isOpen={isCheckoutOpen}
+                            onClose={() => setIsCheckoutOpen(false)}
+                            cartPayload={cartPayload}
+                            onPaymentSuccess={onPaymentSuccess}
+                        />
+                    )}
                 </>
             )}
         </div>

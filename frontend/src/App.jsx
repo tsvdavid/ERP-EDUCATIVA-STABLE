@@ -16,14 +16,38 @@ import TeachersPage from './pages/TeachersPage';
 import ConceptsPage from './pages/treasury/ConceptsPage';
 import PaymentsPage from './pages/treasury/PaymentsPage';
 import InvoicesPage from './pages/treasury/InvoicesPage';
+import TreasuryCreditNotesPage from './pages/treasury/TreasuryCreditNotesPage';
+import TreasuryCreditNoteForm from './pages/treasury/TreasuryCreditNoteForm';
+import TreasuryDebitNotesPage from './pages/treasury/TreasuryDebitNotesPage';
+import TreasuryDebitNoteForm from './pages/treasury/TreasuryDebitNoteForm';
+import MassBillingPage from './pages/treasury/MassBillingPage';
+import TransferVerificationsPage from './pages/admin/TransferVerificationsPage';
+import MyAccountPage from './pages/treasury/MyAccountPage';
 import AccountsPage from './pages/accounting/AccountsPage';
 import JournalEntriesPage from './pages/accounting/JournalEntriesPage';
+import JournalEntryForm from './pages/accounting/JournalEntryForm';
+import LedgerPage from './pages/accounting/LedgerPage';
 import ReportsPage from './pages/accounting/ReportsPage';
+import ComingSoonPage from './pages/accounting/ComingSoonPage';
+import DashboardHome from './pages/DashboardHome';
+import FiscalYearsPage from './pages/accounting/FiscalYearsPage';
 import AttendancePage from './pages/AttendancePage';
 import InstitutionPage from './pages/InstitutionPage';
+import CourseScheduleManager from './pages/academic/CourseScheduleManager';
+import MySchedulePage from './pages/academic/MySchedulePage';
 import SuppliersPage from './pages/purchases/SuppliersPage';
 import PurchasesPage from './pages/purchases/PurchasesPage';
 import PurchaseForm from './pages/purchases/PurchaseForm';
+import CreditNotesPage from './pages/purchases/CreditNotesPage';
+import CreditNoteForm from './pages/purchases/CreditNoteForm';
+import DebitNotesPage from './pages/purchases/DebitNotesPage';
+import LiquidationsPage from './pages/purchases/LiquidationsPage';
+import LiquidationForm from './pages/purchases/LiquidationForm';
+import DebitNoteForm from './pages/purchases/DebitNoteForm';
+import BanksPage from './pages/accounting/BanksPage';
+import BankAccountsPage from './pages/accounting/BankAccountsPage';
+import AssetsPage from './pages/accounting/AssetsPage';
+import AssetForm from './pages/accounting/AssetForm';
 import TicketPortal from './pages/helpdesk/TicketPortal';
 import AgentDashboard from './pages/helpdesk/AgentDashboard';
 import TicketDetail from './pages/helpdesk/TicketDetail';
@@ -35,6 +59,22 @@ import BackupRestorePage from './pages/maintenance/BackupRestorePage';
 import UserMaintenancePage from './pages/maintenance/UserMaintenancePage';
 import LogPage from './pages/maintenance/LogPage';
 import ResetPage from './pages/maintenance/ResetPage';
+import AcademicReportsPage from './pages/academic/AcademicReportsPage';
+import PaymentGatewaysConfigPage from './pages/admin/PaymentGatewaysConfigPage';
+import ProcedureTemplatesPage from './pages/procedures/ProcedureTemplatesPage';
+import RequestsInboxPage from './pages/procedures/RequestsInboxPage';
+import StudentRequestsPage from './pages/procedures/StudentRequestsPage';
+import GlobalReportsPage from './pages/academic/GlobalReportsPage';
+import CampusVirtualPage from './pages/learning/CampusVirtualPage';
+import CoursePlayerPage from './pages/learning/CoursePlayerPage';
+import InstructorDashboard from './pages/learning/InstructorDashboard';
+import ResourceCenterPage from './pages/knowledge/ResourceCenterPage';
+import AIConfigPage from './pages/admin/AIConfigPage';
+import MedicalDispensaryPage from './pages/health/MedicalDispensaryPage';
+import DecePage from './pages/health/DecePage';
+import MyHealthPage from './pages/health/MyHealthPage';
+import BehaviorReportsPage from './pages/health/BehaviorReportsPage';
+import logoEduka360 from './assets/logo-eduka360.jpg';
 
 // Simple Error Boundary
 class ErrorBoundary extends React.Component {
@@ -102,70 +142,75 @@ function App() {
         <SocketProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/dashboard/campus-virtual/player/:courseId" element={
+              <ProtectedRoute>
+                <CoursePlayerPage />
+              </ProtectedRoute>
+            } />
 
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route index element={
-                <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-                  <div className="bg-white p-10 rounded-3xl shadow-xl shadow-indigo-100 border border-indigo-50 max-w-2xl w-full">
-                    <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <span className="text-4xl">🎓</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-800 mb-4">¡Bienvenido a EduERP!</h2>
-                    <p className="text-slate-500 text-lg mb-8">
-                      Tu plataforma de gestión educativa integral. <br />
-                      Selecciona una opción del menú lateral para comenzar.
-                    </p>
-                    <div className="grid grid-cols-2 gap-4 text-left">
-                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="text-xs font-bold text-slate-400 uppercase">Estado del Sistema</p>
-                        <p className="text-green-600 font-medium flex items-center gap-2">● En Línea</p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="text-xs font-bold text-slate-400 uppercase">Tu Rol</p>
-                        <p className="text-indigo-600 font-medium">
-                          {(() => {
-                            const role = user?.role;
-                            const roles = {
-                              'ADMIN': 'Administrador',
-                              'RECTOR': 'Rector/Supervisor',
-                              'TEACHER': 'Profesor',
-                              'PARENT': 'Padre',
-                              'STUDENT': 'Estudiante'
-                            };
-                            return roles[role] || role || 'Cargando...';
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              } />
+              <Route index element={<DashboardHome />} />
               <Route path="academic-years" element={<AcademicYearPage />} />
               <Route path="courses" element={<CoursesPage />} />
               <Route path="subjects" element={<SubjectsPage />} />
+              <Route path="academic/schedules-manager" element={<CourseScheduleManager />} />
               <Route path="students" element={<StudentsPage />} />
               <Route path="grades" element={<GradesPage />} />
               <Route path="student-grades" element={<StudentGradesPage />} />
+              <Route path="my-schedule" element={<MySchedulePage />} />
               <Route path="communication" element={<CommunicationPage />} />
+              <Route path="my-account" element={<MyAccountPage />} />
+              <Route path="procedures/templates" element={<ProcedureTemplatesPage />} />
+              <Route path="procedures/inbox" element={<RequestsInboxPage />} />
+              <Route path="procedures/student" element={<StudentRequestsPage />} />
               <Route path="parent" element={<ParentDashboard />} />
               <Route path="parent/student/:studentId" element={<StudentAcademicDetail />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="teachers" element={<TeachersPage />} />
               <Route path="attendance" element={<AttendancePage />} />
+              <Route path="academic/reports" element={<AcademicReportsPage />} />
+              <Route path="academic/global-reports" element={<GlobalReportsPage />} />
               <Route path="institution" element={<InstitutionPage />} />
               <Route path="treasury/concepts" element={<ConceptsPage />} />
               <Route path="treasury/payments" element={<PaymentsPage />} />
+              <Route path="treasury/mass-billing" element={<MassBillingPage />} />
+              <Route path="treasury/transfers" element={<TransferVerificationsPage />} />
               <Route path="treasury/invoices" element={<InvoicesPage />} />
+              <Route path="treasury/credit-notes" element={<TreasuryCreditNotesPage />} />
+              <Route path="treasury/credit-notes/new" element={<TreasuryCreditNoteForm />} />
+              <Route path="treasury/debit-notes" element={<TreasuryDebitNotesPage />} />
+              <Route path="treasury/debit-notes/new" element={<TreasuryDebitNoteForm />} />
               <Route path="accounting/accounts" element={<AccountsPage />} />
               <Route path="accounting/entries" element={<JournalEntriesPage />} />
+              <Route path="accounting/entries/new" element={<JournalEntryForm />} />
+              <Route path="accounting/ledger" element={<LedgerPage />} />
               <Route path="accounting/reports" element={<ReportsPage />} />
+
+              {/* Nuevas Opciones de Contabilidad (Módulos Pendientes de Desarrollar) */}
+              <Route path="accounting/dashboard" element={<ComingSoonPage title="Dashboard Contable" />} />
+              <Route path="accounting/taxes" element={<ComingSoonPage title="IVA y Tributos" />} />
+              <Route path="accounting/coming-soon/bank-reconciliation" element={<ComingSoonPage title="Conciliación Bancaria" />} />
+              <Route path="accounting/closing" element={<FiscalYearsPage />} />
+              <Route path="accounting/analysis" element={<ComingSoonPage title="Análisis y Reportes" />} />
+              <Route path="accounting/integrations" element={<ComingSoonPage title="Integraciones y Automatizaciones" />} />
+              <Route path="accounting/settings" element={<ComingSoonPage title="Configuración y Seguridad Contable" />} />
+              <Route path="accounting/banks" element={<BanksPage />} />
+              <Route path="accounting/bank-accounts" element={<BankAccountsPage />} />
+              <Route path="accounting/assets" element={<AssetsPage />} />
+              <Route path="accounting/assets/new" element={<AssetForm />} />
               <Route path="purchases/suppliers" element={<SuppliersPage />} />
               <Route path="purchases/invoices" element={<PurchasesPage />} />
               <Route path="purchases/invoices/new" element={<PurchaseForm />} />
+              <Route path="purchases/credit-notes" element={<CreditNotesPage />} />
+              <Route path="purchases/credit-notes/new" element={<CreditNoteForm />} />
+              <Route path="purchases/debit-notes" element={<DebitNotesPage />} />
+              <Route path="purchases/liquidations" element={<LiquidationsPage />} />
+              <Route path="purchases/liquidations/new" element={<LiquidationForm />} />
+              <Route path="purchases/debit-notes/new" element={<DebitNoteForm />} />
               <Route path="helpdesk/tickets" element={<TicketPortal />} />
               <Route path="helpdesk/tickets/:id" element={<MyTicketDetail />} />
               <Route path="helpdesk/tickets/agent/:id" element={<TicketDetail />} />
@@ -175,6 +220,15 @@ function App() {
               <Route path="maintenance/users" element={<UserMaintenancePage />} />
               <Route path="maintenance/log" element={<LogPage />} />
               <Route path="maintenance/reset" element={<ResetPage />} />
+              <Route path="admin/payment-gateways" element={<PaymentGatewaysConfigPage />} />
+              <Route path="admin/ai-config" element={<AIConfigPage />} />
+              <Route path="campus-virtual" element={<CampusVirtualPage />} />
+              <Route path="campus-virtual/instructor" element={<InstructorDashboard />} />
+              <Route path="recursos" element={<ResourceCenterPage />} />
+              <Route path="health/medical-dispensary" element={<MedicalDispensaryPage />} />
+              <Route path="health/dece" element={<DecePage />} />
+              <Route path="health/my-health" element={<MyHealthPage />} />
+              <Route path="health/behavior-records" element={<BehaviorReportsPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

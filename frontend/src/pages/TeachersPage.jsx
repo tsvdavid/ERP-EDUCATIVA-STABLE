@@ -29,6 +29,11 @@ const TeachersPage = () => {
         phone: '',
         address: '',
         birth_date: '',
+        gender: '',
+        nationality: 'Ecuatoriana',
+        civil_status: '',
+        titles: '',
+        teaching_category: '',
 
         photo: null,
         institution: activeInstitution || ''
@@ -49,6 +54,13 @@ const TeachersPage = () => {
             // Fetch ONLY teachers
             const data = await userService.getUsers('TEACHER');
             setTeachers(data);
+            
+            if (user?.role === 'ADMIN' || user?.role === 'LOCAL_ADMIN') {
+                try {
+                    const insts = await userService.getInstitutions();
+                    setInstitutions(insts);
+                } catch (err) { console.error("Error loading institutions: ", err); }
+            }
         } catch (error) {
             console.error(error);
             toast.error("Error al cargar profesores");
@@ -91,8 +103,14 @@ const TeachersPage = () => {
             if (formData.second_surname) data.append('second_surname', formData.second_surname);
             if (formData.cedula) data.append('cedula', formData.cedula);
             if (formData.birth_date) data.append('birth_date', formData.birth_date);
+            if (formData.gender) data.append('gender', formData.gender);
             if (formData.phone) data.append('phone', formData.phone);
             if (formData.address) data.append('address', formData.address);
+            if (formData.nationality) data.append('nationality', formData.nationality);
+            if (formData.civil_status) data.append('civil_status', formData.civil_status);
+            if (formData.titles) data.append('titles', formData.titles);
+            if (formData.teaching_category) data.append('teaching_category', formData.teaching_category);
+
             if (formData.photo instanceof File) {
                 data.append('photo', formData.photo);
             }
@@ -132,6 +150,11 @@ const TeachersPage = () => {
             phone: safeValue(user.phone),
             address: safeValue(user.address),
             birth_date: safeValue(user.birth_date),
+            gender: safeValue(user.gender),
+            nationality: user.nationality || 'Ecuatoriana',
+            civil_status: safeValue(user.civil_status),
+            titles: safeValue(user.titles),
+            teaching_category: safeValue(user.teaching_category),
 
             photo: null,
             institution: user.institution || ''
@@ -281,6 +304,62 @@ const TeachersPage = () => {
                                     <label className="label-modern">Contraseña {editingId && '(Dejar vacío para no cambiar)'}</label>
                                     <input type="password" className="input-modern w-full" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} />
                                 </div>
+
+                                <div className="col-span-full mt-4 pt-4 border-t border-slate-100">
+                                    <h3 className="font-bold text-slate-700 mb-4">Información Demográfica y Escalafón</h3>
+                                </div>
+                                <div>
+                                    <label className="label-modern">Sexo</label>
+                                    <select className="input-modern w-full" value={formData.gender} onChange={e => setFormData({ ...formData, gender: e.target.value })}>
+                                        <option value="">Seleccione...</option>
+                                        <option value="M">Masculino</option>
+                                        <option value="F">Femenino</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label-modern">Fecha de Nacimiento</label>
+                                    <input type="date" className="input-modern w-full" value={formData.birth_date} onChange={e => setFormData({ ...formData, birth_date: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="label-modern">Nacionalidad</label>
+                                    <input type="text" className="input-modern w-full" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="label-modern">Estado Civil</label>
+                                    <select className="input-modern w-full" value={formData.civil_status} onChange={e => setFormData({ ...formData, civil_status: e.target.value })}>
+                                        <option value="">Seleccione...</option>
+                                        <option value="SOLTERO">Soltero/a</option>
+                                        <option value="CASADO">Casado/a</option>
+                                        <option value="DIVORCIADO">Divorciado/a</option>
+                                        <option value="VIUDO">Viudo/a</option>
+                                        <option value="UNION_LIBRE">Unión Libre</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label-modern">Dirección</label>
+                                    <input type="text" className="input-modern w-full" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="label-modern">Categoría del Magisterio</label>
+                                    <select className="input-modern w-full" value={formData.teaching_category} onChange={e => setFormData({ ...formData, teaching_category: e.target.value })}>
+                                        <option value="">Ninguna</option>
+                                        <option value="A">Categoría A</option>
+                                        <option value="B">Categoría B</option>
+                                        <option value="C">Categoría C</option>
+                                        <option value="D">Categoría D</option>
+                                        <option value="E">Categoría E</option>
+                                        <option value="F">Categoría F</option>
+                                        <option value="G">Categoría G</option>
+                                        <option value="H">Categoría H</option>
+                                        <option value="I">Categoría I</option>
+                                        <option value="J">Categoría J</option>
+                                    </select>
+                                </div>
+                                <div className="col-span-full">
+                                    <label className="label-modern">Títulos / Masterados (Separados por comas)</label>
+                                    <textarea className="input-modern w-full" rows="2" placeholder="Ej. Licenciado en Pedagogía, Magíster en Educación Inicial" value={formData.titles} onChange={e => setFormData({ ...formData, titles: e.target.value })}></textarea>
+                                </div>
+
                                 {/* Institution Selector for Admin */}
                                 {user?.role === 'ADMIN' && (
                                     <div className="col-span-full mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">

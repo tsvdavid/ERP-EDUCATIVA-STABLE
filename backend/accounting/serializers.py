@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Account, FiscalYear, JournalEntry, JournalItem
+from .models import Account, FiscalYear, JournalEntry, JournalItem, Bank, BankAccount, FixedAsset, Depreciation
 
 class AccountSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
@@ -36,6 +36,18 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         fields = ['id', 'date', 'description', 'reference', 'state', 'created_by', 'created_by_name', 'created_at', 'posted_at', 'items', 'total_debit', 'total_credit', 'is_balanced']
         read_only_fields = ['created_by', 'created_at', 'posted_at']
 
+    def validate_date(self, value):
+        from .models import FiscalYear
+        request = self.context.get('request')
+        if request and request.user.institution:
+            try:
+                fiscal_year = FiscalYear.objects.get(institution=request.user.institution, year=value.year)
+                if fiscal_year.is_closed:
+                    raise serializers.ValidationError(f"El año fiscal {value.year} está cerrado. No se pueden registrar asientos.")
+            except FiscalYear.DoesNotExist:
+                pass
+        return value
+
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         entry = JournalEntry.objects.create(**validated_data)
@@ -59,3 +71,38 @@ class JournalEntrySerializer(serializers.ModelSerializer):
                  JournalItem.objects.create(journal_entry=instance, **item_data)
                  
         return instance
+
+class BankSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bank
+        fields = '__all__'
+
+class BankAccountSerializer(serializers.ModelSerializer):
+    bank_name = serializers.ReadOnlyField(source='bank.name')
+    linked_account_code = serializers.ReadOnlyField(source='linked_account.code')
+    linked_account_name = serializers.ReadOnlyField(source='linked_account.name')
+    account_type_display = serializers.CharField(source='get_account_type_display', read_only=True)
+    
+    # Casting explícito a DecimalField para evitar errores DRF de Float vs Decimal en operaciones
+    initial_balance = serializers.DecimalField(max_digits=15, decimal_places=2, coerce_to_string=False)
+
+    class Meta:
+        model = BankAccount
+        fields = '__all__'
+
+class DepreciationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Depreciation
+        fields = '__all__'
+
+class FixedAssetSerializer(serializers.ModelSerializer):
+    depreciations = DepreciationSerializer(many=True, read_only=True)
+    account_asset_name = serializers.ReadOnlyField(source='account_asset.name')
+    account_depreciation_name = serializers.ReadOnlyField(source='account_depreciation.name')
+    account_expense_name = serializers.ReadOnlyField(source='account_expense.name')
+    current_value = serializers.ReadOnlyField()
+
+    class Meta:
+        model = FixedAsset
+        fields = '__all__'
+        read_only_fields = ['institution', 'created_at']

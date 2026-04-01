@@ -2,9 +2,131 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Account, FiscalYear, JournalEntry
-from .serializers import AccountSerializer, FiscalYearSerializer, JournalEntrySerializer
+from .models import Account, FiscalYear, JournalEntry, Bank, BankAccount, FixedAsset, Depreciation
+from .serializers import AccountSerializer, FiscalYearSerializer, JournalEntrySerializer, BankSerializer, BankAccountSerializer, FixedAssetSerializer
 from decimal import Decimal
+from django.utils import timezone
+
+class FiscalYearViewSet(viewsets.ModelViewSet):
+    queryset = FiscalYear.objects.all()
+    serializer_class = FiscalYearSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return FiscalYear.objects.filter(institution=self.request.user.institution).order_by('-year')
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
+
+    @action(detail=True, methods=['post'])
+    def close_year(self, request, pk=None):
+        from decimal import Decimal
+        from .models import JournalEntry, JournalItem, AccountingConfig
+        from django.db.models import Sum
+        import datetime
+
+        fiscal_year = self.get_object()
+        institution = request.user.institution
+
+        if fiscal_year.is_closed:
+            return Response({'error': 'El año fiscal ya está cerrado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get Retained Earnings Account
+        try:
+            config = AccountingConfig.objects.get(institution=institution, key='EQUITY_RETAINED_EARNINGS')
+            retained_earnings_account = config.account
+        except AccountingConfig.DoesNotExist:
+            return Response({'error': 'Debe configurar la cuenta de Resultados Acumulados en Configuraciones Contables antes de cerrar el año.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calculate Income and Expenses
+        start_date = datetime.date(fiscal_year.year, 1, 1)
+        end_date = datetime.date(fiscal_year.year, 12, 31)
+
+        items = JournalItem.objects.filter(
+            account__institution=institution,
+            journal_entry__state='POSTED',
+            journal_entry__date__gte=start_date,
+            journal_entry__date__lte=end_date
+        )
+
+        income_items = items.filter(account__account_type='INCOME')
+        expense_items = items.filter(account__account_type='EXPENSE')
+
+        income_balances = income_items.values('account').annotate(
+            net=Sum('credit') - Sum('debit')
+        ).filter(net__gt=0)
+
+        expense_balances = expense_items.values('account').annotate(
+            net=Sum('debit') - Sum('credit')
+        ).filter(net__gt=0)
+        
+        total_income = sum(item['net'] for item in income_balances) if income_balances else Decimal('0.00')
+        total_expense = sum(item['net'] for item in expense_balances) if expense_balances else Decimal('0.00')
+
+        if total_income == Decimal('0.00') and total_expense == Decimal('0.00'):
+            fiscal_year.is_closed = True
+            fiscal_year.save()
+            return Response({'status': 'ok', 'message': 'Año cerrado. No hubo ingresos ni egresos para generar un asiento.'})
+
+        entry = JournalEntry.objects.create(
+            institution=institution,
+            date=end_date,
+            description=f"Cierre del Ejercicio Fiscal {fiscal_year.year}",
+            reference=f"CIERRE-{fiscal_year.year}",
+            state='POSTED',
+            created_by=request.user
+        )
+
+        for ib in income_balances:
+            JournalItem.objects.create(
+                journal_entry=entry,
+                account_id=ib['account'],
+                debit=ib['net'],
+                credit=Decimal('0.00'),
+                description="Cierre de cuenta de Ingreso"
+            )
+
+        for eb in expense_balances:
+            JournalItem.objects.create(
+                journal_entry=entry,
+                account_id=eb['account'],
+                debit=Decimal('0.00'),
+                credit=eb['net'],
+                description="Cierre de cuenta de Gasto"
+            )
+
+        net_income = total_income - total_expense
+
+        if net_income > Decimal('0.00'):
+            JournalItem.objects.create(
+                journal_entry=entry,
+                account=retained_earnings_account,
+                debit=Decimal('0.00'),
+                credit=net_income,
+                description=f"Utilidad del Ejercicio {fiscal_year.year}"
+            )
+        elif net_income < Decimal('0.00'):
+            JournalItem.objects.create(
+                journal_entry=entry,
+                account=retained_earnings_account,
+                debit=abs(net_income),
+                credit=Decimal('0.00'),
+                description=f"Pérdida del Ejercicio {fiscal_year.year}"
+            )
+
+        if not entry.is_balanced:
+            entry.delete()
+            return Response({'error': 'Error de cuadre en el asiento de automático. Por favor contacte a soporte.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        fiscal_year.is_closed = True
+        fiscal_year.save()
+
+        return Response({
+            'status': 'ok', 
+            'message': 'Año cerrado y asiento Cierre del Ejercicio generado exitosamente.',
+            'journal_entry_id': entry.id
+        })
+
 
 class AccountViewSet(viewsets.ModelViewSet):
     queryset = Account.objects.all()
@@ -50,6 +172,38 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
         entry.state = 'POSTED'
         entry.save()
         return Response({'status': 'posted'})
+
+    @action(detail=True, methods=['post'])
+    def cancel_entry(self, request, pk=None):
+        entry = self.get_object()
+        if entry.state == 'CANCELLED':
+            return Response({'error': 'El asiento ya está anulado.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        entry.state = 'CANCELLED'
+        entry.save()
+        return Response({'status': 'cancelled'})
+
+class BankViewSet(viewsets.ModelViewSet):
+    queryset = Bank.objects.all()
+    serializer_class = BankSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Bank.objects.filter(institution=self.request.user.institution).order_by('name')
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
+
+class BankAccountViewSet(viewsets.ModelViewSet):
+    queryset = BankAccount.objects.all()
+    serializer_class = BankAccountSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return BankAccount.objects.filter(institution=self.request.user.institution).select_related('bank', 'linked_account').order_by('bank__name', 'account_number')
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
 
 from django.db.models import Sum, Q
 
@@ -154,6 +308,82 @@ class ReportViewSet(viewsets.ViewSet):
         response['Content-Disposition'] = f'attachment; filename="ATS_{year}_{month:02d}.xml"'
         return response
 
+    @action(detail=False, methods=['get'])
+    def ledger(self, request):
+        user = request.user
+        account_id = request.query_params.get('account_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        if not account_id:
+            return Response({'error': 'account_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import JournalItem, Account
+        
+        try:
+            account = Account.objects.get(id=account_id, institution=user.institution)
+        except Account.DoesNotExist:
+            return Response({'error': 'Cuenta no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+        queryset = JournalItem.objects.filter(
+            account=account, 
+            journal_entry__state='POSTED'
+        ).select_related('journal_entry').order_by('journal_entry__date', 'id')
+
+        # Calculate previous balance
+        previous_debits = Decimal(0)
+        previous_credits = Decimal(0)
+        
+        if start_date:
+            from django.db.models import Sum
+            prev_items = JournalItem.objects.filter(
+                account=account,
+                journal_entry__state='POSTED',
+                journal_entry__date__lt=start_date
+            )
+            previous_debits = prev_items.aggregate(Sum('debit'))['debit__sum'] or Decimal(0)
+            previous_credits = prev_items.aggregate(Sum('credit'))['credit__sum'] or Decimal(0)
+            
+            queryset = queryset.filter(journal_entry__date__gte=start_date)
+
+        if end_date:
+            queryset = queryset.filter(journal_entry__date__lte=end_date)
+
+        initial_balance = Decimal(0)
+        if account.account_type in ['ASSET', 'EXPENSE']:
+            initial_balance = previous_debits - previous_credits
+        else:
+            initial_balance = previous_credits - previous_debits
+
+        data = []
+        running_balance: Decimal = initial_balance
+
+        for item in queryset:
+            if account.account_type in ['ASSET', 'EXPENSE']:
+                running_balance += Decimal(item.debit - item.credit)
+            else:
+                running_balance += Decimal(item.credit - item.debit)
+
+            data.append({
+                'id': item.id,
+                'date': item.journal_entry.date.strftime('%Y-%m-%d'),
+                'journal_id': item.journal_entry.id,
+                'description': item.description or item.journal_entry.description,
+                'reference': item.journal_entry.reference,
+                'debit': item.debit,
+                'credit': item.credit,
+                'balance': running_balance
+            })
+
+        return Response({
+            'account_id': account.id,
+            'account_code': account.code,
+            'account_name': account.name,
+            'initial_balance': initial_balance,
+            'transactions': data,
+            'final_balance': running_balance
+        })
+
     def _get_account_tree(self, institution, account_type):
         from .models import Account
         # Fetch all accounts of this type
@@ -187,7 +417,9 @@ class ReportViewSet(viewsets.ViewSet):
             if node['parent']:
                 if node['parent'] in acc_map:
                     parent = acc_map[node['parent']]
-                    parent['children'].append(node)
+                    children = parent['children']
+                    if isinstance(children, list):
+                        children.append(node)
             else:
                 roots.append(node)
                 
@@ -210,3 +442,85 @@ class ReportViewSet(viewsets.ViewSet):
         for node in tree_nodes:
             total += node['balance']
         return total
+
+class FixedAssetViewSet(viewsets.ModelViewSet):
+    queryset = FixedAsset.objects.all()
+    serializer_class = FixedAssetSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return FixedAsset.objects.filter(institution=self.request.user.institution).order_by('-purchase_date')
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
+
+    @action(detail=True, methods=['post'])
+    def calculate_depreciation(self, request, pk=None):
+        asset = self.get_object()
+        
+        # Simple straight-line depreciation logic
+        monthly_depreciation = (asset.purchase_price - asset.salvage_value) / Decimal(str(asset.useful_life_years * 12))
+        
+        # Calculate how many months pending
+        last_depreciation = asset.depreciations.first()
+        start_date = last_depreciation.date if last_depreciation else asset.purchase_date
+        
+        today = timezone.now().date()
+        
+        months_passed = (today.year - start_date.year) * 12 + today.month - start_date.month
+        
+        if months_passed <= 0:
+            return Response({'error': 'No ha pasado un mes desde la última depreciación o compra.'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        total_to_depreciate = monthly_depreciation * Decimal(str(months_passed))
+        
+        balance_to_depreciate = (asset.purchase_price - asset.salvage_value) - asset.accumulated_depreciation
+        
+        if asset.accumulated_depreciation + total_to_depreciate > (asset.purchase_price - asset.salvage_value):
+            total_to_depreciate = balance_to_depreciate
+            
+        if total_to_depreciate <= 0 or balance_to_depreciate <= 0:
+            return Response({'error': 'Activo totalmente depreciado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create Journal Entry
+        entry = JournalEntry.objects.create(
+            institution=request.user.institution,
+            date=today,
+            description=f"Depreciación de activo: {asset.name} ({months_passed} meses)",
+            state='POSTED',
+            created_by=request.user
+        )
+        
+        from .models import JournalItem
+        # Debit Expense
+        JournalItem.objects.create(
+            journal_entry=entry,
+            account=asset.account_expense,
+            debit=total_to_depreciate,
+            credit=Decimal('0.00'),
+            description=f"Depreciación {asset.name}"
+        )
+        
+        # Credit Accumulated Depreciation
+        JournalItem.objects.create(
+            journal_entry=entry,
+            account=asset.account_depreciation,
+            debit=Decimal('0.00'),
+            credit=total_to_depreciate,
+            description=f"Depreciación {asset.name}"
+        )
+        
+        # Record Depreciation
+        dep = Depreciation.objects.create(
+            asset=asset,
+            date=today,
+            amount=total_to_depreciate,
+            journal_entry=entry,
+            notes=f"Depreciación por {months_passed} meses"
+        )
+        
+        # Update Asset
+        asset.accumulated_depreciation += total_to_depreciate
+        asset.save()
+        
+        return Response({'status': 'ok', 'amount': total_to_depreciate, 'months': months_passed})

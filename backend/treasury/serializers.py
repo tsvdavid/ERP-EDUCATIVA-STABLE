@@ -1,8 +1,10 @@
 from rest_framework import serializers
-from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge
+from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge, CreditNote, DebitNote
 from users.serializers import UserSerializer
 
 class PaymentConceptSerializer(serializers.ModelSerializer):
+    iva_rate = serializers.DecimalField(max_digits=4, decimal_places=2, required=False)
+    
     class Meta:
         model = PaymentConcept
         fields = '__all__'
@@ -40,7 +42,7 @@ class ChargeSerializer(serializers.ModelSerializer):
 
 class CreateInvoiceSerializer(serializers.Serializer):
     student_id = serializers.IntegerField()
-    payment_method_id = serializers.IntegerField()
+    payment_method_id = serializers.IntegerField(required=False, allow_null=True)
     client_name = serializers.CharField(required=False, allow_blank=True)
     client_ruc = serializers.CharField(required=False, allow_blank=True)
     client_address = serializers.CharField(required=False, allow_blank=True)
@@ -56,3 +58,19 @@ class StudentAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentAccount
         fields = '__all__'
+
+class CreditNoteSerializer(serializers.ModelSerializer):
+    invoice_number = serializers.CharField(source='invoice.number', read_only=True)
+    
+    class Meta:
+        model = CreditNote
+        fields = '__all__'
+        read_only_fields = ('number', 'issue_date', 'status', 'created_at')
+
+class DebitNoteSerializer(serializers.ModelSerializer):
+    invoice_number = serializers.CharField(source='invoice.number', read_only=True)
+    
+    class Meta:
+        model = DebitNote
+        fields = '__all__'
+        read_only_fields = ('number', 'issue_date', 'status', 'created_at')

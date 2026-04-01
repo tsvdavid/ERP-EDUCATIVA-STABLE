@@ -8,7 +8,10 @@ const StudentsPage = () => {
     const [students, setStudents] = useState([]);
     const [courses, setCourses] = useState([]);
     const [enrollments, setEnrollments] = useState([]);
+    const [institutions, setInstitutions] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const { user, activeInstitution } = useAuthStore();
 
     // Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -31,9 +34,17 @@ const StudentsPage = () => {
         email: '',
         birth_date: '',
         gender: '',
+        nationality: 'Ecuatoriana',
+        civil_status: '',
         notes: '',
+        address: '',
         role: 'STUDENT',
+        institution: activeInstitution || '',
         representative_name: '',
+        representative_cedula: '',
+        representative_email: '',
+        representative_address: '',
+        use_representative_for_billing: false,
         phone: '',
         secondary_phone: ''
     });
@@ -55,6 +66,13 @@ const StudentsPage = () => {
             setStudents(Array.isArray(studentsData) ? studentsData : []);
             setCourses(Array.isArray(coursesData) ? coursesData : []);
             setEnrollments(Array.isArray(enrollmentsData) ? enrollmentsData : []);
+            
+            if (user?.role === 'ADMIN' || user?.role === 'LOCAL_ADMIN') {
+                try {
+                    const insts = await userService.getInstitutions();
+                    setInstitutions(insts);
+                } catch (err) { console.error("Error loading institutions: ", err); }
+            }
         } catch (error) {
             console.error("Error loading data", error);
         } finally {
@@ -69,20 +87,16 @@ const StudentsPage = () => {
         return courses.find(c => c.id === enrollment.course);
     };
 
-    const { user, activeInstitution } = useAuthStore();
-
     const handleCreateOrUpdateStudent = async (e) => {
         e.preventDefault();
 
-        let targetInstitution = activeInstitution || user?.institution;
+        let targetInstitution = studentData.institution || activeInstitution || user?.institution;
 
         // Fallback: If no institution in context, try to fetch it (for Admins/Single Tenant)
         if (!targetInstitution) {
             try {
-                const insts = await userService.getInstitutions();
-                if (insts && insts.length > 0) {
-                    targetInstitution = insts[0].id;
-                    // Optionally update store/localstorage? skipping for now to strict local scope.
+                if (institutions && institutions.length > 0) {
+                    targetInstitution = institutions[0].id;
                 }
             } catch (err) {
                 console.error("Failed to fallback fetch institution:", err);
@@ -186,9 +200,17 @@ const StudentsPage = () => {
             email: student.email,
             birth_date: student.birth_date || '',
             gender: student.gender || '',
+            nationality: student.nationality || 'Ecuatoriana',
+            civil_status: student.civil_status || '',
             notes: student.notes || '',
+            address: student.address || '',
             role: 'STUDENT',
+            institution: student.institution || activeInstitution || '',
             representative_name: student.representative_name || '',
+            representative_cedula: student.representative_cedula || '',
+            representative_email: student.representative_email || '',
+            representative_address: student.representative_address || '',
+            use_representative_for_billing: student.use_representative_for_billing || false,
             phone: student.phone || '',
             secondary_phone: student.secondary_phone || ''
         });
@@ -206,9 +228,17 @@ const StudentsPage = () => {
             email: '',
             birth_date: '',
             gender: '',
+            nationality: 'Ecuatoriana',
+            civil_status: '',
             notes: '',
+            address: '',
             role: 'STUDENT',
+            institution: activeInstitution || '',
             representative_name: '',
+            representative_cedula: '',
+            representative_email: '',
+            representative_address: '',
+            use_representative_for_billing: false,
             phone: '',
             secondary_phone: ''
         });
@@ -389,16 +419,17 @@ const StudentsPage = () => {
 
             {showCreateModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col animate-in fade-in zoom-in">
+                        <div className="flex justify-between items-center p-6 border-b border-slate-100 shrink-0">
                             <h2 className="text-2xl font-bold text-slate-800">
                                 {isEditing ? 'Editar Estudiante' : 'Nuevo Estudiante'}
                             </h2>
-                            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <button type="button" onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                                 <X size={24} />
                             </button>
                         </div>
-                        <form onSubmit={handleCreateOrUpdateStudent} className="space-y-4">
+                        <div className="p-6 overflow-y-auto">
+                            <form onSubmit={handleCreateOrUpdateStudent} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
@@ -432,8 +463,31 @@ const StudentsPage = () => {
                                         <option value="">Seleccione...</option>
                                         <option value="M">Masculino</option>
                                         <option value="F">Femenino</option>
-                                        <option value="O">Otro</option>
                                     </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Nacionalidad</label>
+                                    <input type="text" className="input-modern p-3 w-full"
+                                        value={studentData.nationality} onChange={e => setStudentData({ ...studentData, nationality: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Estado Civil</label>
+                                    <select className="input-modern p-3 w-full" value={studentData.civil_status} onChange={e => setStudentData({ ...studentData, civil_status: e.target.value })}>
+                                        <option value="">Seleccione...</option>
+                                        <option value="SOLTERO">Soltero/a</option>
+                                        <option value="CASADO">Casado/a</option>
+                                        <option value="DIVORCIADO">Divorciado/a</option>
+                                        <option value="VIUDO">Viudo/a</option>
+                                        <option value="UNION_LIBRE">Unión Libre</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
+                                    <input type="text" className="input-modern p-3 w-full"
+                                        value={studentData.address} onChange={e => setStudentData({ ...studentData, address: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-2 pt-4 border-t border-slate-100">
+                                    <h3 className="font-bold text-slate-700 mb-2">Datos del Representante</h3>
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Representante</label>
@@ -441,8 +495,34 @@ const StudentsPage = () => {
                                         value={studentData.representative_name} onChange={e => setStudentData({ ...studentData, representative_name: e.target.value })} />
                                 </div>
                                 <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Cédula / RUC</label>
+                                    <input type="text" placeholder="Cédula o RUC" className="input-modern p-3 w-full"
+                                        value={studentData.representative_cedula} onChange={e => setStudentData({ ...studentData, representative_cedula: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Correo Electrónico</label>
+                                    <input type="email" placeholder="Correo del representante" className="input-modern p-3 w-full"
+                                        value={studentData.representative_email} onChange={e => setStudentData({ ...studentData, representative_email: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Dirección del Representante</label>
+                                    <input type="text" placeholder="Dirección completa" className="input-modern p-3 w-full"
+                                        value={studentData.representative_address} onChange={e => setStudentData({ ...studentData, representative_address: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-2 flex items-center gap-2 mb-2 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <input type="checkbox" id="billing_check" className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                                        checked={studentData.use_representative_for_billing} onChange={e => setStudentData({ ...studentData, use_representative_for_billing: e.target.checked })} />
+                                    <label htmlFor="billing_check" className="text-sm font-medium text-indigo-900 cursor-pointer">
+                                        Utilizar la información de este representante para la facturación electrónica
+                                    </label>
+                                </div>
+
+                                <div className="md:col-span-2 pt-4 border-t border-slate-100">
+                                    <h3 className="font-bold text-slate-700 mb-2">Contacto Alternativo</h3>
+                                </div>
+                                <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Celular / Teléfono</label>
-                                    <input type="text" placeholder="Número de contacto" className="input-modern p-3 w-full"
+                                    <input type="text" placeholder="Número de contacto principal" className="input-modern p-3 w-full"
                                         value={studentData.phone} onChange={e => setStudentData({ ...studentData, phone: e.target.value })} />
                                 </div>
                                 <div>
@@ -453,10 +533,26 @@ const StudentsPage = () => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Notas</label>
-                                <textarea placeholder="Notas adicionales..." className="input-modern p-3 w-full" rows="3"
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Observaciones</label>
+                                <textarea placeholder="Alergias, necesidades especiales, notas adicionales..." className="input-modern p-3 w-full" rows="3"
                                     value={studentData.notes} onChange={e => setStudentData({ ...studentData, notes: e.target.value })}></textarea>
                             </div>
+
+                            {user?.role === 'ADMIN' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Institución</label>
+                                    <select
+                                        className="input-modern w-full p-3 bg-slate-50"
+                                        value={studentData.institution}
+                                        onChange={(e) => setStudentData({ ...studentData, institution: e.target.value })}
+                                    >
+                                        <option value="">-- Seleccione Institución --</option>
+                                        {institutions.map(inst => (
+                                            <option key={inst.id} value={inst.id}>{inst.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="relative">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
@@ -473,6 +569,7 @@ const StudentsPage = () => {
                                 </button>
                             </div>
                         </form>
+                        </div>
                     </div>
                 </div>
             )}

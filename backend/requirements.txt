@@ -17,3 +17,7 @@ channels-redis<4.0.0
 django-redis
 xhtml2pdf
 matplotlib
+stripe==11.5.0
+mercadopago
+anthropic
+openai

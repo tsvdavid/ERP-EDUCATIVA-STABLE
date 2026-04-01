@@ -9,7 +9,7 @@ const CoursesPage = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [formData, setFormData] = useState({ id: null, name: '', description: '', level: '', parallel: 'A', year: new Date().getFullYear() });
+    const [formData, setFormData] = useState({ id: null, name: '', description: '', level: '', parallel: 'A', year: new Date().getFullYear(), grading_type: 'QUANTITATIVE' });
 
     const [institutionId, setInstitutionId] = useState(null);
     const { user } = useAuthStore();
@@ -119,14 +119,15 @@ const CoursesPage = () => {
             description: course.description,
             level: course.level,
             parallel: course.parallel,
-            year: course.year
+            year: course.year,
+            grading_type: course.grading_type || 'QUANTITATIVE'
         });
         setIsEditing(true);
         setShowModal(true);
     };
 
     const resetForm = () => {
-        setFormData({ id: null, name: '', description: '', level: '', parallel: 'A', year: new Date().getFullYear() });
+        setFormData({ id: null, name: '', description: '', level: '', parallel: 'A', year: new Date().getFullYear(), grading_type: 'QUANTITATIVE' });
     };
 
     const canManageCourses = user?.role === 'ADMIN' || user?.role === 'RECTOR';
@@ -288,6 +289,19 @@ const CoursesPage = () => {
                                         />
                                     </div>
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Tipo de Calificación</label>
+                                <select
+                                    value={formData.grading_type}
+                                    onChange={e => setFormData({ ...formData, grading_type: e.target.value })}
+                                    className="input-modern"
+                                >
+                                    <option value="QUANTITATIVE">Cuantitativa (0-10)</option>
+                                    <option value="QUALITATIVE_DESTREZAS">Cualitativa - Destrezas (DA, EP, I, NE)</option>
+                                    <option value="QUALITATIVE_PROYECTOS">Cualitativa - Proyectos (EX, MB, B, R)</option>
+                                    <option value="QUALITATIVE_COMPORTAMIENTO">Cualitativa - Comportamiento (A, B, C, D, E)</option>
+                                </select>
                             </div>
                             <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-50">
                                 <button

@@ -110,6 +110,7 @@ class AccountingConfig(models.Model):
         ('INCOME_SERVICES', 'Ingresos - Servicios Educativos'),
         ('LIABILITY_SUPPLIERS', 'Pasivo - Proveedores (Cuentas por Pagar)'),
         ('ASSET_TAX_CREDIT', 'Activo - IVA Crédito Tributario'),
+        ('EQUITY_RETAINED_EARNINGS', 'Patrimonio - Resultados Acumulados / Utilidad del Ejercicio'),
     )
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='accounting_configs')
@@ -123,3 +124,111 @@ class AccountingConfig(models.Model):
 
     def __str__(self):
         return f"{self.institution.name} : {self.get_key_display()} -> {self.account.code}"
+
+class Bank(models.Model):
+    """
+    Catálogo de Instituciones Financieras (Bancos, Cooperativas).
+    """
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='banks')
+    name = models.CharField(max_length=150, verbose_name="Nombre del Banco")
+    code = models.CharField(max_length=50, blank=True, verbose_name="Código (Opcional/SRI)")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = ('institution', 'name')
+        verbose_name = "Banco"
+        verbose_name_plural = "Bancos"
+
+    def __str__(self):
+        return self.name
+
+class BankAccount(models.Model):
+    """
+    Cuentas bancarias operativas de la Institución.
+    """
+    ACCOUNT_TYPES = (
+        ('SAVINGS', 'Ahorros'),
+        ('CHECKING', 'Corriente'),
+        ('VIRTUAL', 'Billetera Virtual / Online'),
+    )
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='bank_accounts')
+    bank = models.ForeignKey(Bank, on_delete=models.PROTECT, related_name='accounts', verbose_name="Banco")
+    
+    account_number = models.CharField(max_length=50, verbose_name="Número de Cuenta")
+    account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='CHECKING', verbose_name="Tipo de Cuenta")
+    
+    # Enlace opcional al Plan de Cuentas Contable
+    linked_account = models.ForeignKey(Account, on_delete=models.SET_NULL, null=True, blank=True, related_name='bank_accounts', verbose_name="Cuenta Contable Asociada")
+    
+    initial_balance = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Saldo Inicial")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('institution', 'bank', 'account_number')
+        verbose_name = "Cuenta Bancaria"
+        verbose_name_plural = "Cuentas Bancarias"
+
+    def __str__(self):
+        return f"{self.bank.name} - {self.get_account_type_display()} {self.account_number}"
+
+class FixedAsset(models.Model):
+    """
+    Activos Fijos de la Institución.
+    """
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='fixed_assets')
+    name = models.CharField(max_length=200, verbose_name="Nombre del Activo")
+    code = models.CharField(max_length=50, blank=True, verbose_name="Código Interno / Etiqueta")
+    
+    purchase_date = models.DateField(verbose_name="Fecha de Compra")
+    purchase_price = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Valor de Adquisición")
+    salvage_value = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Valor Residual (Salvamento)")
+    useful_life_years = models.PositiveIntegerField(verbose_name="Vida Útil (Años)")
+    
+    accumulated_depreciation = models.DecimalField(max_digits=15, decimal_places=2, default=0.00, verbose_name="Depreciación Acumulada")
+    
+    # Cuentas contables relacionadas
+    account_asset = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='assets_as_asset', verbose_name="Cuenta de Activo")
+    account_depreciation = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='assets_as_depreciation', verbose_name="Cuenta Depreciación Acumulada")
+    account_expense = models.ForeignKey(Account, on_delete=models.PROTECT, related_name='assets_as_expense', verbose_name="Cuenta Gasto por Depreciación")
+    
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-purchase_date', 'name']
+        verbose_name = "Activo Fijo"
+        verbose_name_plural = "Activos Fijos"
+
+    def __str__(self):
+        return f"{self.code} - {self.name}"
+
+    @property
+    def current_value(self):
+        from decimal import Decimal
+        return Decimal(str(self.purchase_price)) - Decimal(str(self.accumulated_depreciation))
+
+
+class Depreciation(models.Model):
+    """
+    Historial de Depreciaciones de un Activo Fijo.
+    """
+    asset = models.ForeignKey(FixedAsset, on_delete=models.CASCADE, related_name='depreciations')
+    date = models.DateField(verbose_name="Fecha de Depreciación")
+    amount = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Monto Depreciado")
+    
+    journal_entry = models.ForeignKey(JournalEntry, on_delete=models.SET_NULL, null=True, blank=True, related_name='depreciation_records')
+    notes = models.CharField(max_length=255, blank=True, verbose_name="Notas / Periodo")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+        verbose_name = "Registro de Depreciación"
+        verbose_name_plural = "Registros de Depreciaciones"
+
+    def __str__(self):
+        return f"Dep. {self.asset.name} - {self.date} - ${self.amount}"

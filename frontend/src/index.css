@@ -23,7 +23,7 @@
   }
 
   ::selection {
-    @apply bg-indigo-500/20 text-indigo-900;
+    @apply bg-primary-500/20 text-primary-900;
   }
 }
 
@@ -31,7 +31,7 @@
 
   /* Botones Premium */
   .btn-primary {
-    @apply inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-lg shadow-indigo-500/30 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 hover:shadow-indigo-500/40 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-lg shadow-primary-500/30 transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 hover:shadow-primary-500/40 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
@@ -61,7 +61,7 @@
   }
 
   .input-modern {
-    @apply w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all duration-200 py-2.5 px-3 sm:text-sm shadow-sm;
+    @apply w-full rounded-lg border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-primary-100 focus:border-primary-500 transition-all duration-200 py-2.5 px-3 sm:text-sm shadow-sm;
   }
 
   .input-error {

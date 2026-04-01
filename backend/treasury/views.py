@@ -7,10 +7,11 @@ from django.http import HttpResponse
 from io import BytesIO
 import datetime
 
-from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge
+from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge, CreditNote, DebitNote
 from .serializers import (
     PaymentConceptSerializer, PaymentMethodSerializer, 
-    InvoiceSerializer, CreateInvoiceSerializer, StudentAccountSerializer, ChargeSerializer
+    InvoiceSerializer, CreateInvoiceSerializer, StudentAccountSerializer, ChargeSerializer,
+    CreditNoteSerializer, DebitNoteSerializer
 )
 from users.models import User, Institution
 
@@ -68,6 +69,15 @@ class ChargeViewSet(viewsets.ModelViewSet):
         if pending == 'true':
             queryset = queryset.filter(is_paid=False)
             
+            try:
+                from payments.models import Transaction
+                verifying_txns = Transaction.objects.filter(status='VERIFYING').values_list('reference_id', flat=True)
+                verifying_ids = [int(rid) for rid in verifying_txns if rid and rid.isdigit()]
+                if verifying_ids:
+                    queryset = queryset.exclude(id__in=verifying_ids)
+            except Exception as e:
+                pass
+            
         return queryset
 
     @action(detail=False, methods=['post'], url_path='generate-monthly')
@@ -120,6 +130,87 @@ class ChargeViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=400)
 
+    @action(detail=False, methods=['get'], url_path='financial-stats')
+    def financial_stats(self, request):
+        """
+        Summary of pending payments grouped by course.
+        Supports filtering by academic_year_id and course_id.
+        """
+        user = self.request.user
+        inst_id = user.institution_id
+        if not inst_id:
+             inst_id = request.headers.get('X-Institution-ID')
+             
+        if not inst_id:
+             return Response({"error": "No institution context found"}, status=400)
+
+        from django.db.models import Sum, Q
+        from academic.models import Course
+        
+        year_id = request.query_params.get('academic_year_id')
+        course_id = request.query_params.get('course_id')
+
+        # Filter courses
+        courses_query = Course.objects.filter(institution_id=inst_id)
+        if year_id:
+            try:
+                from academic.models import AcademicYear
+                ay = AcademicYear.objects.get(pk=year_id)
+                courses_query = courses_query.filter(year=ay.year)
+            except (AcademicYear.DoesNotExist, ValueError):
+                pass
+        if course_id:
+            courses_query = courses_query.filter(id=course_id)
+
+        # Global Total Pending
+        global_filter = Q(student__institution_id=inst_id, is_paid=False)
+        if year_id:
+            try:
+                from academic.models import AcademicYear
+                ay = AcademicYear.objects.get(pk=year_id)
+                global_filter &= Q(student__enrollments__course__year=ay.year)
+            except (AcademicYear.DoesNotExist, ValueError):
+                pass
+        if course_id:
+            global_filter &= Q(student__enrollments__course_id=course_id)
+            
+        global_total = Charge.objects.filter(global_filter).distinct().aggregate(total=Sum('amount'))['total'] or 0
+
+        stats = []
+        for course in courses_query:
+            pending_total = Charge.objects.filter(
+                student__enrollments__course=course,
+                is_paid=False
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            # Count students with pending charges
+            pending_count = Charge.objects.filter(
+                student__enrollments__course=course,
+                is_paid=False
+            ).values('student').distinct().count()
+
+            stats.append({
+                'course_id': course.id,
+                'course_name': f"{course.name} {course.parallel}",
+                'pending_amount': float(pending_total),
+                'pending_students': pending_count
+            })
+            
+        return Response({
+            'global_total': global_total,
+            'by_course': stats
+        })
+            
+        # Global Total
+        global_pending = Charge.objects.filter(institution_id=inst_id, is_paid=False).aggregate(total=Sum('amount'))['total'] or 0
+        total_debtors = Charge.objects.filter(institution_id=inst_id, is_paid=False).values('student').distinct().count()
+
+        return Response({
+            'by_course': stats,
+            'global_total': float(global_pending),
+            'total_debtors': total_debtors
+        })
+
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().select_related('institution', 'student', 'payment_method').prefetch_related('details', 'details__concept')
     serializer_class = InvoiceSerializer
@@ -166,7 +257,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             
             try:
                 student = User.objects.get(pk=data['student_id'])
-                pay_method = PaymentMethod.objects.get(pk=data['payment_method_id'])
+                
+                pay_method_id = data.get('payment_method_id')
+                pay_method = PaymentMethod.objects.get(pk=pay_method_id) if pay_method_id else None
+                is_pending = request.data.get('is_pending', False)
                 
                 # Create Invoice Header
                 last_invoice = Invoice.objects.filter(institution=student.institution).order_by('-id').first()
@@ -241,10 +335,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                                 raise Exception(f"La deuda '{charge_obj.concept.name}' ya se encuentra pagada.")
                                 
                             price = charge_obj.amount # Use the amount from the charge
-                            charge_obj.is_paid = True
-                            charge_obj.save()
+                            if not is_pending:
+                                charge_obj.is_paid = True
+                                charge_obj.save()
                         except Charge.DoesNotExist:
                             pass
+                    else:
+                        if is_pending:
+                            from datetime import date
+                            charge_obj = Charge.objects.create(
+                                institution=student.institution,
+                                student=student,
+                                concept=concept,
+                                amount=price * qty,
+                                due_date=date.today(),
+                                is_paid=False
+                            )
                     
                     subtotal = price * qty
                     
@@ -272,12 +378,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 invoice.total = total_0 + total_15 + total_iva
                 invoice.save()
                 
-                # Register Payment
-                Payment.objects.create(
-                    invoice=invoice,
-                    amount_paid=invoice.total,
-                    verified=True
-                )
+                # Register Payment if not pending
+                if not is_pending:
+                    Payment.objects.create(
+                        invoice=invoice,
+                        amount_paid=invoice.total,
+                        verified=True
+                    )
                 
                 # Update Student Balance (Here we assume payment covers immediate debt or adds credit if previously owed)
                 # Ideally, we should have a separate DEBT generation process.
@@ -296,6 +403,119 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='mass-billing')
+    @transaction.atomic
+    def mass_billing(self, request):
+        """
+        Receives:
+        {
+            "student_ids": [1, 2, 3],
+            "payment_method_id": 2, // optional
+            "concept_id": 1
+        }
+        """
+        student_ids = request.data.get('student_ids', [])
+        concept_id = request.data.get('concept_id')
+        pay_method_id = request.data.get('payment_method_id')
+        
+        if not student_ids or not concept_id:
+            return Response({'error': 'Faltan datos requeridos (student_ids, concept_id)'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            concept = PaymentConcept.objects.get(pk=concept_id)
+            pay_method = PaymentMethod.objects.get(pk=pay_method_id) if pay_method_id else None
+            
+            students = User.objects.filter(id__in=student_ids, role='STUDENT')
+            if not students.exists():
+                return Response({'error': 'No se encontraron estudiantes para facturar.'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            inst = students.first().institution or concept.institution
+            est = inst.establishment_code if hasattr(inst, 'establishment_code') else '001'
+            pto = inst.emission_point if hasattr(inst, 'emission_point') else '001'
+            
+            # Obtener ultima secuencia
+            last_invoice = Invoice.objects.filter(institution=inst).order_by('-id').first()
+            seq = 1
+            if last_invoice:
+                parts = last_invoice.number.split('-')
+                if len(parts) == 3:
+                    try: seq = int(parts[2]) + 1
+                    except: pass
+                elif last_invoice.number.isdigit():
+                    seq = int(last_invoice.number) + 1
+                    
+            from datetime import date
+            created_count = 0
+            
+            for student in students:
+                invoice_number = f"{est}-{pto}-{seq:09d}"
+                seq += 1
+                
+                # 1. Crear Deuda (Charge) ya que es pendiente (is_pending=True equivalent)
+                charge_obj = Charge.objects.create(
+                    institution=inst,
+                    student=student,
+                    concept=concept,
+                    amount=concept.price,
+                    due_date=date.today(),
+                    is_paid=False
+                )
+                
+                # 2. Crear Factura
+                invoice = Invoice.objects.create(
+                    institution=inst,
+                    student=student,
+                    number=invoice_number,
+                    status='ISSUED',
+                    client_name=f"{student.first_name} {student.last_name}",
+                    client_ruc=student.cedula or '9999999999999',
+                    client_address=student.address or 'Sin dirección',
+                    client_email=student.email or '',
+                    payment_method=pay_method,
+                    created_by=request.user
+                )
+                
+                # 3. Detalles y Totales
+                subtotal = concept.price
+                total_15 = 0
+                total_0 = 0
+                iva = 0
+                
+                if concept.iva_rate > 0:
+                    total_15 = subtotal
+                    iva = subtotal * concept.iva_rate
+                else:
+                    total_0 = subtotal
+                    
+                InvoiceDetail.objects.create(
+                    invoice=invoice,
+                    concept=concept,
+                    quantity=1,
+                    unit_price=concept.price,
+                    subtotal=subtotal,
+                    charge=charge_obj
+                )
+                
+                invoice.subtotal_0 = total_0
+                invoice.subtotal_15 = total_15
+                invoice.iva_total = iva
+                invoice.total = total_0 + total_15 + iva
+                invoice.save()
+                
+                # No se crea el 'Payment' log porque es pendiente.
+                created_count += 1
+                
+            return Response({
+                'message': f'Facturación masiva de {created_count} facturas pendientes con éxito.',
+                'count': created_count
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
     @action(detail=True, methods=['get'])
     def download_pdf(self, request, pk=None):
@@ -561,3 +781,47 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class CreditNoteViewSet(viewsets.ModelViewSet):
+    queryset = CreditNote.objects.all().select_related('invoice')
+    serializer_class = CreditNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = super().get_queryset()
+        if user.role in ['STUDENT', 'PARENT']:
+            if user.role == 'STUDENT':
+                return queryset.filter(invoice__student=user)
+            else:
+                children_ids = user.children.values_list('id', flat=True)
+                return queryset.filter(invoice__student__id__in=children_ids)
+        return queryset
+
+    def perform_create(self, serializer):
+        last_note = CreditNote.objects.order_by('-id').first()
+        seq = (last_note.id + 1) if last_note else 1
+        number = f"NC-{str(seq).zfill(6)}"
+        serializer.save(number=number)
+
+class DebitNoteViewSet(viewsets.ModelViewSet):
+    queryset = DebitNote.objects.all().select_related('invoice')
+    serializer_class = DebitNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = super().get_queryset()
+        if user.role in ['STUDENT', 'PARENT']:
+            if user.role == 'STUDENT':
+                return queryset.filter(invoice__student=user)
+            else:
+                children_ids = user.children.values_list('id', flat=True)
+                return queryset.filter(invoice__student__id__in=children_ids)
+        return queryset
+
+    def perform_create(self, serializer):
+        last_note = DebitNote.objects.order_by('-id').first()
+        seq = (last_note.id + 1) if last_note else 1
+        number = f"ND-{str(seq).zfill(6)}"
+        serializer.save(number=number)

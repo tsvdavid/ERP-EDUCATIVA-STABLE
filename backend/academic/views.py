@@ -1,6 +1,6 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
-from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod
+from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod, ClassSchedule
 from .serializers import (
     CourseSerializer, 
     SubjectSerializer, 
@@ -9,11 +9,12 @@ from .serializers import (
     AttendanceSerializer,
     EvaluationCategorySerializer,
     AcademicYearSerializer,
-    AcademicPeriodSerializer
+    AcademicPeriodSerializer,
+    ClassScheduleSerializer
 )
-from users.permissions import IsAdminUser, IsRectorUser, IsTeacherUser
+from users.permissions import IsAdminOrLocalAdminUser, IsRectorUser, IsTeacherUser, IsAdminUser
 from rest_framework.decorators import action
-from django.db.models import Count, Case, When
+from django.db.models import Count, Case, When, Q
 from django.utils.translation import gettext_lazy as _
 
 
@@ -30,7 +31,7 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
         return [permissions.IsAuthenticated()]
 
 class AcademicPeriodViewSet(viewsets.ModelViewSet):
@@ -39,7 +40,7 @@ class AcademicPeriodViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
         return [permissions.IsAuthenticated()]
 
 class CourseViewSet(viewsets.ModelViewSet):
@@ -49,7 +50,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
@@ -238,6 +239,126 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             raise ValidationError("El estudiante ya está matriculado en un curso. Elimine la matrícula anterior para cambiarlo.")
         serializer.save()
 
+    @action(detail=False, methods=['get'], url_path='excellence-ranking')
+    def excellence_ranking(self, request):
+        """
+        Ranking of students with highest averages across the institution or filtered by course/level.
+        """
+        user = self.request.user
+        queryset = self.get_queryset() # Respects institution and year filters
+        
+        level = request.query_params.get('level')
+        course_id = request.query_params.get('course_id')
+        year_id = request.query_params.get('academic_year_id')
+        
+        if year_id:
+            try:
+                ay = AcademicYear.objects.get(pk=year_id)
+                queryset = queryset.filter(course__year=ay.year)
+            except (AcademicYear.DoesNotExist, ValueError):
+                pass
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        if level:
+            queryset = queryset.filter(course__level=level)
+            
+        from typing import List, Dict, Any
+        rankings: List[Dict[str, Any]] = []
+        for enrollment in queryset:
+            summary = enrollment.calculate_averages()
+            if not summary:
+                continue
+                
+            # Global Average (mean of all subjects' finals)
+            final_scores = [data['final'] for data in summary.values() if data['final'] is not None]
+            if not final_scores:
+                continue
+            
+            avg = round(float(sum(final_scores) / len(final_scores)), 2)
+            rankings.append({
+                'student_id': enrollment.student.id,
+                'student_name': f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                'course_name': f"{enrollment.course.name} {enrollment.course.parallel}",
+                'level': enrollment.course.level,
+                'average': avg
+            })
+            
+        # Sort by average descending
+        rankings = sorted(rankings, key=lambda x: x['average'], reverse=True)
+        return Response(list(rankings)[:20]) # Top 20 for abanderados/escoltas
+
+    @action(detail=False, methods=['get'], url_path='institution-stats')
+    def institution_stats(self, request):
+        """
+        Aggregated demographic and disciplinary stats for the entire institution.
+        """
+        user = self.request.user
+        inst_id = user.institution_id
+        if not inst_id:
+             inst_id = request.headers.get('X-Institution-ID')
+             
+        if not inst_id:
+             return Response({"error": "No institution context found"}, status=400)
+             
+        # 1. Demographics (Students & Teachers)
+        from users.models import User as CustomUser
+        base_users = CustomUser.objects.filter(institution_id=inst_id)
+        
+        demographics = {
+            'students': {
+                'M': base_users.filter(role='STUDENT', gender='M').count(),
+                'F': base_users.filter(role='STUDENT', gender='F').count(),
+                'total': base_users.filter(role='STUDENT').count()
+            },
+            'teachers': {
+                'M': base_users.filter(role='TEACHER', gender='M').count(),
+                'F': base_users.filter(role='TEACHER', gender='F').count(),
+                'total': base_users.filter(role='TEACHER').count()
+            }
+        }
+        
+        # 2. Disciplinary Summary
+        from .models import Observation
+        year_id = request.query_params.get('academic_year_id')
+        course_id = request.query_params.get('course_id')
+        
+        obs_filter = Q(student__institution_id=inst_id)
+        if year_id:
+            # Observation doesn't have course/year directly, but we can filter via enrollment in that year
+            obs_filter &= Q(student__enrollments__course__academic_year_id=year_id)
+        if course_id:
+            obs_filter &= Q(student__enrollments__course_id=course_id)
+            
+        observations = Observation.objects.filter(obs_filter).distinct()
+        discipline = {
+            'behavioral': observations.filter(type='BEHAVIORAL').count(),
+            'academic': observations.filter(type='ACADEMIC').count(),
+            'positive': observations.filter(type='POSITIVE').count(),
+            'critical_high': observations.filter(criticality='HIGH').count()
+        }
+        
+        # 3. Attendance Global
+        from .models import Attendance
+        att_filter = Q(enrollment__course__institution_id=inst_id)
+        if year_id:
+            att_filter &= Q(enrollment__course__academic_year_id=year_id)
+        if course_id:
+            att_filter &= Q(enrollment__course_id=course_id)
+            
+        attendance = Attendance.objects.filter(att_filter)
+        att_summary = {
+            'present': attendance.filter(status='PRESENT').count(),
+            'absent': attendance.filter(status='ABSENT').count(),
+            'late': attendance.filter(status='LATE').count(),
+            'excused': attendance.filter(status='EXCUSED').count()
+        }
+        
+        return Response({
+            'demographics': demographics,
+            'discipline': discipline,
+            'attendance': att_summary
+        })
+
 
 
     @action(detail=True, methods=['get'])
@@ -265,13 +386,28 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
                 return "NA (No Alcanza los Aprendizajes)"
 
             # Enrich summary with qualitative data
+            # Enrich summary with qualitative data
             subjects_data = [] # For graph
             scores_data = []   # For graph
+            recommendations = [] # For PDF logic
 
             for subject_id, data in summary.items():
                 data['qualitative'] = get_qualitative_score(data['final'])
                 subjects_data.append(data['name'])
                 scores_data.append(data['final'])
+                
+                # Parse final score to add recommendations
+                if data['final'] is not None:
+                    try:
+                        score_val = float(data['final'])
+                        if score_val >= 9.0:
+                            recommendations.append({'subject': data['name'], 'type': 'success', 'message': '¡Excelente trabajo! Continúa reforzando estas habilidades.'})
+                        elif score_val >= 7.0:
+                            recommendations.append({'subject': data['name'], 'type': 'warning', 'message': 'Buen desempeño, esfuérzate un poco más para dominar los temas.'})
+                        else:
+                            recommendations.append({'subject': data['name'], 'type': 'danger', 'message': 'Alerta: Necesitas refuerzo académico. Busca apoyo con tu docente.'})
+                    except Exception:
+                        pass
             
             # --- GRAPH GENERATION ---
             import matplotlib
@@ -302,6 +438,25 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             buf.seek(0)
             image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
             
+            # --- ATTENDANCE SUMMARY ---
+            attendance_records = enrollment.attendance_records.all()
+            total_classes = attendance_records.count()
+            attendance_summary = {
+                'total_classes': total_classes, 'present': 0, 'absent': 0,
+                'late': 0, 'excused': 0, 'percentage': 100.0
+            }
+            if total_classes > 0:
+                p = attendance_records.filter(status='PRESENT').count()
+                a = attendance_records.filter(status='ABSENT').count()
+                l = attendance_records.filter(status='LATE').count()
+                e = attendance_records.filter(status='EXCUSED').count()
+                attended = p + l + e
+                attendance_summary.update({
+                    'present': p, 'absent': a, 'late': l, 'excused': e,
+                    'percentage': round((attended / total_classes) * 100, 2)
+                })
+
+            # Prepare Context
             # Prepare Context
             context = {
                 'enrollment': enrollment,
@@ -309,6 +464,8 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
                 'institution': enrollment.course.institution,
                 'logo_path': None,
                 'chart_image': image_base64,
+                'recommendations': recommendations,
+                'attendance_summary': attendance_summary,
                 'generated_at': None 
             }
             
@@ -489,6 +646,98 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=False, methods=['get'], url_path='course-stats')
+    def course_stats(self, request):
+        """
+        Endpoint to provide statistical data for grades in a course/subject.
+        """
+        course_id = request.query_params.get('course_id')
+        subject_id = request.query_params.get('subject_id')
+        
+        if not course_id:
+            return Response({"error": "course_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Get the enrollments to calculate real averages
+        enrollments = Enrollment.objects.filter(course_id=course_id)
+        if not enrollments.exists():
+            return Response({"error": "No hay matrículas en el curso"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Trimester breakdown and Distrubtion
+        summary_results = []
+        distribution = { "DA": 0, "AA": 0, "PA": 0, "NA": 0 }
+        risk_students = []
+
+        from decimal import Decimal
+        trim_averages = {1: [], 2: [], 3: []}
+        
+        for e in enrollments:
+            avgs = e.calculate_averages()
+            
+            # If subject_id is provided, limit to that subject
+            if subject_id:
+                if int(subject_id) in avgs:
+                    subj_avg = avgs[int(subject_id)]
+                else:
+                    continue
+            else:
+                # Use global average of all subjects for this student
+                if len(avgs) > 0:
+                    total_final = sum(data['final'] for data in avgs.values()) / len(avgs)
+                    subj_avg = {'final': total_final, 't1': 0, 't2': 0, 't3': 0}
+                    # Approximate trimesters
+                    for t in [1, 2, 3]:
+                        t_vals = [data.get(f't{t}', 0) for data in avgs.values()]
+                        subj_avg[f't{t}'] = sum(t_vals) / len(t_vals) if len(t_vals) > 0 else 0
+                else:
+                    continue
+            
+            final_score = subj_avg['final']
+            # Distribute
+            if final_score >= 9: distribution["DA"] += 1
+            elif final_score >= 7: distribution["AA"] += 1
+            elif final_score >= 4: distribution["PA"] += 1
+            else: distribution["NA"] += 1
+            
+            # Risk
+            if final_score < 7:
+                risk_students.append({
+                    "student_name": f"{e.student.first_name} {e.student.last_name}",
+                    "score": round(float(final_score), 2),
+                    "id": e.student.id
+                })
+                
+            # Trimester arrays
+            trim_averages[1].append(subj_avg.get('t1', 0))
+            trim_averages[2].append(subj_avg.get('t2', 0))
+            trim_averages[3].append(subj_avg.get('t3', 0))
+
+        # Calculate averages for trimesters across course
+        def avg_list(lst):
+            actuals = [x for x in lst if x > 0]
+            if not actuals: return 0
+            return round(float(sum(actuals) / len(actuals)), 2)
+
+        course_average = avg_list([subj_avg['final'] for subj_avg in [e.calculate_averages().get(int(subject_id) if subject_id else next(iter(e.calculate_averages())), {'final':0}) for e in enrollments] if 'final' in subj_avg])
+
+        trimesters_chart = [
+            {"name": "Tri 1", "promedio": avg_list(trim_averages[1])},
+            {"name": "Tri 2", "promedio": avg_list(trim_averages[2])},
+            {"name": "Tri 3", "promedio": avg_list(trim_averages[3])},
+            {"name": "Final", "promedio": course_average},
+        ]
+
+        return Response({
+            "course_average": course_average,
+            "distribution": [
+                {"name": "DA (9-10)", "value": distribution["DA"], "fill": "#10b981"},
+                {"name": "AA (7-8.9)", "value": distribution["AA"], "fill": "#3b82f6"},
+                {"name": "PA (4-6.9)", "value": distribution["PA"], "fill": "#f59e0b"},
+                {"name": "NA (0-3.9)", "value": distribution["NA"], "fill": "#ef4444"},
+            ],
+            "trimesters": trimesters_chart,
+            "risk_students": sorted(risk_students, key=lambda x: x['score'])
+        })
+
 class AttendanceViewSet(viewsets.ModelViewSet):
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -605,4 +854,72 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             })
             
         return Response(data)
+
+    @action(detail=False, methods=['get'], url_path='dashboard-stats')
+    def dashboard_stats(self, request):
+        course_id = request.query_params.get('course_id')
+        if not course_id:
+            return Response({"error": "course_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        enrollments = Enrollment.objects.filter(course_id=course_id).count()
+        
+        # Base filter
+        att_filter = Attendance.objects.filter(enrollment__course_id=course_id)
+        
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        if start_date:
+            att_filter = att_filter.filter(date__gte=start_date)
+        if end_date:
+            att_filter = att_filter.filter(date__lte=end_date)
+            
+        total_records = att_filter.count()
+        present_count = att_filter.filter(status='PRESENT').count()
+        absent_count = att_filter.filter(status='ABSENT').count()
+        late_count = att_filter.filter(status='LATE').count()
+        excused_count = att_filter.filter(status='EXCUSED').count()
+        
+        # Calculate percentages
+        def get_pct(count):
+            return round((count / total_records * 100), 2) if total_records > 0 else 0
+            
+        return Response({
+            "total_students": enrollments,
+            "total_records": total_records,
+            "series": [
+                {"name": "Presentes", "value": present_count, "fill": "#10b981"},
+                {"name": "Atrasos", "value": late_count, "fill": "#f59e0b"},
+                {"name": "Justificados", "value": excused_count, "fill": "#3b82f6"},
+                {"name": "Ausencias", "value": absent_count, "fill": "#ef4444"},
+            ],
+            "global_attendance_pct": get_pct(present_count + late_count + excused_count)
+        })
+
+class ClassScheduleViewSet(viewsets.ModelViewSet):
+    queryset = ClassSchedule.objects.all()
+    serializer_class = ClassScheduleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = ClassSchedule.objects.all()
+        user = self.request.user
+        
+        if user.role == 'STUDENT':
+            queryset = queryset.filter(subject__course__enrollments__student=user).distinct()
+        elif user.role == 'PARENT':
+            student_id = self.request.query_params.get('student_id', None)
+            if student_id:
+                # Validar que el student_id pertenezca a los hijos del padre
+                queryset = queryset.filter(
+                    subject__course__enrollments__student_id=student_id, 
+                    subject__course__enrollments__student__in=user.children.all()
+                ).distinct()
+            else:
+                queryset = queryset.filter(subject__course__enrollments__student__in=user.children.all()).distinct()
+        
+        course_id = self.request.query_params.get('course', None)
+        if course_id:
+            queryset = queryset.filter(subject__course_id=course_id)
+        
+        return queryset
 

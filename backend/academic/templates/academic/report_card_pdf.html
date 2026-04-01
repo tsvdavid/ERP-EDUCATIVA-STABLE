@@ -116,7 +116,7 @@
         }
 
         .chart-img {
-            width: 90%;
+            width: 500px;
             border: 1px solid #eee;
             padding: 5px;
         }
@@ -128,6 +128,19 @@
             font-size: 9px;
             margin-top: 30px;
         }
+        /* Classes para lógica de color */
+        .score-fail { color: #e74c3c; }
+        .score-pass { color: #27ae60; }
+
+        .rec-base {
+            padding: 8px 10px;
+            background-color: #f8f9fa;
+            border-bottom: 2px solid #fff;
+            border-left: 4px solid #e74c3c; /* fallback */
+        }
+        .rec-success { border-left-color: #27ae60; }
+        .rec-warning { border-left-color: #f39c12; }
+        .rec-danger { border-left-color: #e74c3c; }
     </style>
 </head>
 
@@ -146,7 +159,7 @@
         </div>
     </div>
 
-    <!-- STUDENT INFO -->
+    <!-- STUDENT INFO Y ASISTENCIA -->
     <div class="info-box">
         <table class="info-table">
             <tr>
@@ -161,6 +174,24 @@
                 <td class="info-label">FECHA:</td>
                 <td>{% now "d/m/Y" %}</td>
             </tr>
+            {% if attendance_summary %}
+            <tr>
+                <td colspan="4" style="padding-top: 10px;">
+                    <table style="width: 100%; border-top: 1px dashed #ccc; padding-top: 8px; font-size: 10px;">
+                        <tr>
+                            <td class="info-label" style="width: auto;">ASISTENCIA:</td>
+                            <td><strong>{{ attendance_summary.percentage }}%</strong></td>
+                            <td class="info-label" style="width: auto; color:#7f8c8d;">Días Laborados:</td>
+                            <td>{{ attendance_summary.total_classes }}</td>
+                            <td class="info-label" style="width: auto; color:#e74c3c;">Faltas:</td>
+                            <td>{{ attendance_summary.absent }}</td>
+                            <td class="info-label" style="width: auto; color:#f39c12;">Atrasos:</td>
+                            <td>{{ attendance_summary.late }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            {% endif %}
         </table>
     </div>
 
@@ -177,10 +208,15 @@
             {% for subject_id, item in summary.items %}
             <tr>
                 <td>{{ item.name }}</td>
-                <td class="score-col" style="color: {% if item.final < 7 %}#e74c3c{% else %}#27ae60{% endif %};">
+                {% if item.effective_grading_type != 'QUANTITATIVE' %}
+                <td class="score-col">{{ item.qualitative }}</td>
+                <td class="qual-col"></td>
+                {% else %}
+                <td class="score-col {% if item.final < 7 %}score-fail{% else %}score-pass{% endif %}">
                     {{ item.final }}
                 </td>
                 <td class="qual-col">{{ item.qualitative }}</td>
+                {% endif %}
             </tr>
             {% empty %}
             <tr>
@@ -198,17 +234,35 @@
     </div>
     {% endif %}
 
+    <!-- RECOMMENDATIONS -->
+    {% if recommendations %}
+    <div style="margin-top: 20px; page-break-inside: avoid;">
+        <h3 style="color: #2c3e50; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Recomendaciones
+            del Docente / Departamento Académico</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            {% for rec in recommendations %}
+            <tr>
+                <td class="rec-base {% if rec.type == 'success' %}rec-success{% elif rec.type == 'warning' %}rec-warning{% else %}rec-danger{% endif %}">
+                    <strong>{{ rec.subject }}:</strong> <span style="color: #555;">{{ rec.message }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- SCALES REFERENCE -->
     <!-- SCALES REFERENCE -->
     <div style="margin-top: 20px; font-size: 9px; color: #777;">
-        <strong>Escala Cualitativa:</strong><br>
-        DA: Domina los Aprendizajes (9.00 - 10.00)<br>
-        AA: Alcanza los Aprendizajes Requeridos (7.00 - 8.99)<br>
-        PA: Próximo a Alcanzar los Aprendizajes Requeridos (4.01 - 6.99)<br>
-        NA: No Alcanza los Aprendizajes Requeridos (<= 4.00) </div>
+        <strong>Escalas de Evaluación (Ecuador):</strong><br><br>
+        <strong>Destrezas:</strong> DA: Destreza Alcanzada (9-10) | EP: En Proceso (7-8.99) | I: Iniciada (5-6.99) | NE: No Evaluada (<=4)<br>
+        <strong>Proyectos:</strong> EX: Excelente (9-10) | MB: Muy Bueno (7-8.99) | B: Bueno (5-6.99) | R: Regular (<=4)<br>
+        <strong>Comportamiento:</strong> A: Muy Satisfactorio (9-10) | B: Satisfactorio (7-8.99) | C: Poco Satisfactorio (5-6.99) | D: Mejorable (4-4.99) | E: Insatisfactorio (<4)
+    </div>
 
             <!-- FOOTER CONTENT (Used by static frame if configured or just normal flow) -->
             <div id="footerContent" class="footer">
-                Generado automáticamente por ERP EDUCATIVA el {% now "Y-m-d H:i" %}
+                Generado automáticamente por Eduka360 el {% now "Y-m-d H:i" %}
             </div>
 
 </body>

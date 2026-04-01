@@ -71,7 +71,8 @@ class Command(BaseCommand):
                 ('David', 'Castro', 'Informática'),
             ]
 
-            teachers = []
+            from typing import List
+            teachers: List[User] = []
             for first, last, specialization in teachers_data:
                 username = f"{first[0].lower()}{last.lower()}"
                 user, created = User.objects.get_or_create(
@@ -148,7 +149,7 @@ class Command(BaseCommand):
             ]
 
             all_students = []
-            student_idx = 0
+            student_idx: int = 0
             
             for course in courses:
                 # Assign 4 students per course
@@ -230,7 +231,7 @@ class Command(BaseCommand):
                             subject=subject,
                             category=cat,
                             defaults={
-                                'score': round(score, 2),
+                                'score': round(float(score), 2),
                                 'date': date.today(),
                                 'observation': 'Buen trabajo' if score > 8 else 'Mejorar'
                             }

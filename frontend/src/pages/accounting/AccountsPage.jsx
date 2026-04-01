@@ -144,19 +144,21 @@ const AccountsPage = () => {
                 </button>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden group">
-                <div className="p-4 border-b border-slate-100 flex justify-between bg-slate-50 text-xs font-bold text-slate-500 uppercase">
-                    <span className="pl-8">Código / Nombre</span>
-                    <span>Acciones (Hover)</span>
-                </div>
-                <div className="max-h-[70vh] overflow-y-auto">
-                    {loading ? (
-                        <div className="p-8 text-center text-slate-400">Cargando Plan de Cuentas...</div>
-                    ) : accounts.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400">No hay cuentas registradas.</div>
-                    ) : (
-                        renderTree(null)
-                    )}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto group">
+                <div className="min-w-[700px] sm:min-w-full">
+                    <div className="p-4 border-b border-slate-100 flex justify-between bg-slate-50 text-xs font-bold text-slate-500 uppercase">
+                        <span className="pl-8">Código / Nombre</span>
+                        <span>Acciones (Hover)</span>
+                    </div>
+                    <div className="max-h-[70vh] overflow-y-auto">
+                        {loading ? (
+                            <div className="p-8 text-center text-slate-400">Cargando Plan de Cuentas...</div>
+                        ) : accounts.length === 0 ? (
+                            <div className="p-8 text-center text-slate-400">No hay cuentas registradas.</div>
+                        ) : (
+                            renderTree(null)
+                        )}
+                    </div>
                 </div>
             </div>
 

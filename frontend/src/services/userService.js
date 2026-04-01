@@ -4,7 +4,9 @@ const userService = {
     getUsers: async (role = null) => {
         let url = '/users/';
         if (role) {
-            url += `?role=${role}`;
+            url += `?role=${role}&limit=5000`;
+        } else {
+            url += `?limit=5000`;
         }
         const response = await api.get(url);
         if (Array.isArray(response.data)) {

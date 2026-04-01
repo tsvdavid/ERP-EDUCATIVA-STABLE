@@ -90,8 +90,8 @@ def copy_accounting_data(source_name, target_name):
 
     # 3. Journal Entries and Items
     print("3. Copying Journal Entries...")
-    entries_count = 0
-    items_count = 0
+    entries_count: int = 0
+    items_count: int = 0
     
     source_entries = JournalEntry.objects.filter(institution=source_inst)
     

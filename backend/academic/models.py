@@ -3,6 +3,32 @@ from users.models import Institution, User
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
 
+def get_qualitative_grade(score, scale_type='QUALITATIVE_DESTREZAS'):
+    if score is None:
+        return "-"
+    try:
+        val = float(score)
+    except (ValueError, TypeError):
+        return "-"
+        
+    if scale_type == 'QUALITATIVE_PROYECTOS':
+        if val >= 9.0: return "EX"
+        elif val >= 7.0: return "MB"
+        elif val >= 5.0: return "B"
+        else: return "R"
+    elif scale_type == 'QUALITATIVE_COMPORTAMIENTO':
+        if val >= 9.0: return "A"
+        elif val >= 7.0: return "B"
+        elif val >= 5.0: return "C"
+        elif val >= 4.0: return "D"
+        else: return "E"
+    else:
+        # Default Destrezas
+        if val >= 9.0: return "DA"
+        elif val >= 7.0: return "EP"
+        elif val >= 5.0: return "I"
+        else: return "NE"
+
 class AcademicYear(models.Model):
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='academic_years')
     name = models.CharField(max_length=100)  # e.g., "2024-2025"
@@ -46,12 +72,19 @@ class AcademicPeriod(models.Model):
         return f"Trimestre {self.number} - {self.academic_year.name}"
 
 class Course(models.Model):
+    class GradingType(models.TextChoices):
+        QUANTITATIVE = 'QUANTITATIVE', _('Cuantitativa (0-10)')
+        QUALITATIVE_DESTREZAS = 'QUALITATIVE_DESTREZAS', _('Cualitativa - Destrezas (DA, EP, I, NE)')
+        QUALITATIVE_PROYECTOS = 'QUALITATIVE_PROYECTOS', _('Cualitativa - Proyectos (EX, MB, B, R)')
+        QUALITATIVE_COMPORTAMIENTO = 'QUALITATIVE_COMPORTAMIENTO', _('Cualitativa - Comportamiento (A, B, C, D, E)')
+
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='courses')
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     level = models.CharField(max_length=50, blank=True) # e.g., "Primaria", "Secundaria"
     parallel = models.CharField(max_length=10, blank=True, default='A') # e.g., "A", "B"
     year = models.IntegerField() # Año lectivo
+    grading_type = models.CharField(max_length=50, choices=GradingType.choices, default=GradingType.QUANTITATIVE)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -63,9 +96,17 @@ class Course(models.Model):
         return f"{self.name} {self.parallel} ({self.year})"
 
 class Subject(models.Model):
+    class SubjectGradingType(models.TextChoices):
+        INHERIT = 'INHERIT', _('Heredar del Curso')
+        QUANTITATIVE = 'QUANTITATIVE', _('Cuantitativa (0-10)')
+        QUALITATIVE_DESTREZAS = 'QUALITATIVE_DESTREZAS', _('Cualitativa - Destrezas (DA, EP, I, NE)')
+        QUALITATIVE_PROYECTOS = 'QUALITATIVE_PROYECTOS', _('Cualitativa - Proyectos (EX, MB, B, R)')
+        QUALITATIVE_COMPORTAMIENTO = 'QUALITATIVE_COMPORTAMIENTO', _('Cualitativa - Comportamiento (A, B, C, D, E)')
+
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='subjects')
     name = models.CharField(max_length=100)
     teacher = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, limit_choices_to={'role': 'TEACHER'}, related_name='subjects_taught')
+    grading_type = models.CharField(max_length=30, choices=SubjectGradingType.choices, default=SubjectGradingType.INHERIT)
     
     def __str__(self):
         return f"{self.name} - {self.course}"
@@ -142,12 +183,21 @@ class Enrollment(models.Model):
             
             final = round((scores[1] + scores[2] + scores[3]) / 3, 2)
             
+            # Determine effective grading type for this subject
+            effective_grading_type = subject.grading_type
+            if effective_grading_type == 'INHERIT':
+                effective_grading_type = self.course.grading_type
+                
+            qualitative_string = get_qualitative_grade(final, effective_grading_type) if effective_grading_type != 'QUANTITATIVE' else "-"
+            
             summary[subject.id] = {
                 'name': subject.name,
                 't1': scores[1],
                 't2': scores[2],
                 't3': scores[3],
                 'final': final,
+                'effective_grading_type': effective_grading_type,
+                'qualitative': qualitative_string,
                 'details': details # Returns {1: [...], 2: [...], 3: [...]}
             }
             
@@ -221,3 +271,27 @@ class Observation(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()} - {self.student}: {self.criticality}"
+
+class ClassSchedule(models.Model):
+    class DayOfWeek(models.IntegerChoices):
+        MONDAY = 1, _('Lunes')
+        TUESDAY = 2, _('Martes')
+        WEDNESDAY = 3, _('Miércoles')
+        THURSDAY = 4, _('Jueves')
+        FRIDAY = 5, _('Viernes')
+        SATURDAY = 6, _('Sábado')
+        SUNDAY = 7, _('Domingo')
+
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='schedules')
+    day_of_week = models.IntegerField(choices=DayOfWeek.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    
+    class Meta:
+        ordering = ['day_of_week', 'start_time']
+        verbose_name = _('Horario de Clase')
+        verbose_name_plural = _('Horarios de Clases')
+        unique_together = ('subject', 'day_of_week', 'start_time', 'end_time')
+
+    def __str__(self):
+        return f"{self.subject} - {self.get_day_of_week_display()} ({self.start_time.strftime('%H:%M')} a {self.end_time.strftime('%H:%M')})"

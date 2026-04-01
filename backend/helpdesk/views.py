@@ -1,23 +1,29 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import ServiceCatalog, Ticket, Workflow, TicketSurvey
-from users.models import Institution
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from .models import ServiceCatalog, Ticket, Workflow, TicketSurvey, TicketCategory, TicketComment, TicketAttachment, SLA, CannedResponse
+from users.models import Institution, User
 from rest_framework.exceptions import ValidationError
 from .serializers import (
-    ServiceCatalogSerializer, 
-    TicketSerializer, 
-    WorkflowSerializer, 
-    TicketSurveySerializer
+    ServiceCatalogSerializer,
+    TicketSerializer,
+    WorkflowSerializer,
+    TicketSurveySerializer,
+    TicketCategorySerializer, TicketCommentSerializer,
+    TicketAttachmentSerializer, SLASerializer, CannedResponseSerializer
 )
+from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser
+from reportlab.lib.pagesizes import letter
 
 class ServiceCatalogViewSet(viewsets.ModelViewSet):
     queryset = ServiceCatalog.objects.filter(is_active=True)
     serializer_class = ServiceCatalogSerializer
-    
+
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAdminUser()]
+            return [IsAdminOrLocalAdminUser()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
@@ -26,10 +32,10 @@ class ServiceCatalogViewSet(viewsets.ModelViewSet):
             # Fallback for superusers without institution: grab the first one
             if self.request.user.is_superuser:
                 inst = Institution.objects.first()
-            
+
             if not inst:
                 raise ValidationError({"institution": "User must belong to an institution to create catalog items."})
-        
+
         serializer.save(institution=inst)
 
 class TicketViewSet(viewsets.ModelViewSet):
@@ -42,7 +48,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         qs = Ticket.objects.select_related('requester', 'assigned_to', 'category', 'institution', 'current_step')
 
         # If admin/staff (Agent), see all or assigned. If student/teacher, only requested.
-        if user.role in ['ADMIN', 'RECTOR', 'SECRETARY'] or user.is_superuser: 
+        if user.role in ['ADMIN', 'RECTOR', 'SECRETARY'] or user.is_superuser:
             if user.is_superuser and not user.institution:
                 return qs.all()
             return qs.filter(institution=user.institution)

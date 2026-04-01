@@ -13,8 +13,8 @@ const SubjectsPage = () => {
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
 
-    // El modelo Subject requiere: name, course (ID), teacher (ID)
-    const [formData, setFormData] = useState({ id: null, name: '', course: '', teacher: '' });
+    // El modelo Subject requiere: name, course (ID), teacher (ID), grading_type
+    const [formData, setFormData] = useState({ id: null, name: '', course: '', teacher: '', grading_type: 'INHERIT' });
 
     useEffect(() => {
         loadData();
@@ -48,7 +48,7 @@ const SubjectsPage = () => {
                 alert('Materia creada con éxito');
             }
             setShowModal(false);
-            setFormData({ id: null, name: '', course: '', teacher: '' });
+            setFormData({ id: null, name: '', course: '', teacher: '', grading_type: 'INHERIT' });
             loadData();
         } catch (error) {
             console.error(error);
@@ -72,7 +72,7 @@ const SubjectsPage = () => {
     };
 
     const openCreateModal = () => {
-        setFormData({ id: null, name: '', course: '', teacher: '' });
+        setFormData({ id: null, name: '', course: '', teacher: '', grading_type: 'INHERIT' });
         setIsEditing(false);
         setShowModal(true);
     };
@@ -82,7 +82,8 @@ const SubjectsPage = () => {
             id: subject.id,
             name: subject.name,
             course: subject.course,
-            teacher: subject.teacher || ''
+            teacher: subject.teacher || '',
+            grading_type: subject.grading_type || 'INHERIT'
         });
         setIsEditing(true);
         setShowModal(true);
@@ -206,6 +207,20 @@ const SubjectsPage = () => {
                                             {teacher.first_name} {teacher.last_name}
                                         </option>
                                     ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Calificación</label>
+                                <select
+                                    value={formData.grading_type}
+                                    onChange={e => setFormData({ ...formData, grading_type: e.target.value })}
+                                    className="input-modern w-full"
+                                >
+                                    <option value="INHERIT">Heredar del Curso</option>
+                                    <option value="QUANTITATIVE">Cuantitativa (0-10)</option>
+                                    <option value="QUALITATIVE_DESTREZAS">Cualitativa - Destrezas (DA, EP, I, NE)</option>
+                                    <option value="QUALITATIVE_PROYECTOS">Cualitativa - Proyectos (EX, MB, B, R)</option>
+                                    <option value="QUALITATIVE_COMPORTAMIENTO">Cualitativa - Comportamiento (A, B, C, D, E)</option>
                                 </select>
                             </div>
                             <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-50">

@@ -212,9 +212,12 @@ const PaymentsPage = () => {
 
         setProcessing(true);
         try {
+            const isPending = selectedMethod === 'PENDING';
+
             const payload = {
                 student_id: selectedStudent.id,
-                payment_method_id: selectedMethod,
+                payment_method_id: isPending ? null : selectedMethod,
+                is_pending: isPending,
                 client_name: billingInfo.client_name,
                 client_ruc: billingInfo.client_ruc,
                 client_address: billingInfo.client_address,
@@ -228,9 +231,9 @@ const PaymentsPage = () => {
 
             const invoice = await treasuryService.processPayment(payload);
             setLastInvoice(invoice);
-            toast.success("Pago registrado exitosamente");
+            toast.success(isPending ? "Factura creada con saldo pendiente" : "Cobro registrado exitosamente");
             setCart([]);
-            // Reload Pending Charges (some might be paid now)
+            // Reload Pending Charges (some might be paid or added now)
             const pendingCharges = await treasuryService.getCharges({ student_id: selectedStudent.id, pending: 'true' });
             setCharges(pendingCharges);
         } catch (error) {
@@ -261,7 +264,7 @@ const PaymentsPage = () => {
         <div className="space-y-6">
             <Toaster position="top-right" />
 
-            <h1 className="text-2xl font-bold text-slate-800">Caja y Pagos</h1>
+            <h1 className="text-2xl font-bold text-slate-800">Facturación y Cobros</h1>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Student Selection & Concepts */}
@@ -456,6 +459,7 @@ const PaymentsPage = () => {
                                 onChange={e => setSelectedMethod(e.target.value)}
                             >
                                 <option value="">-- Seleccione --</option>
+                                <option value="PENDING" className="font-bold text-red-600">Dejar como Pendiente (Saldos por Cobrar)</option>
                                 {paymentMethods.map(m => (
                                     <option key={m.id} value={m.id}>{m.name}</option>
                                 ))}

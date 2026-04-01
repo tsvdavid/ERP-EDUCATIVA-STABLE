@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Message, Notification, Notice, Holiday
 from .serializers import MessageSerializer, NotificationSerializer, NoticeSerializer, HolidaySerializer
+from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser # Added this import
 from django.db.models import Q
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -211,13 +212,13 @@ class HolidayViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
              return [permissions.IsAuthenticated()]
-        return [permissions.IsAdminUser()]
+        return [IsAdminOrLocalAdminUser()] # Changed from permissions.IsAdminUser()
     
     def get_queryset(self):
          # Allow all authenticated users to view
          return Holiday.objects.all().order_by('date')
 
-    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminOrLocalAdminUser]) # Changed from permissions.IsAdminUser
     def populate_holidays(self, request):
         """Populate holidays for Ecuador for a given year (defaults to current)"""
         import holidays

@@ -4,7 +4,7 @@ import sys
 from decimal import Decimal
 
 # Setup Django Environment
-sys.path.append(r'c:\Users\Soporte\Documents\PROYECTOS NETFORCE\ERP EDUCATIVA\backend')
+sys.path.append(r'c:\Users\Soporte\Documents\PROYECTOS NETFORCE\Eduka360\backend')
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 

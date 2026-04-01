@@ -155,7 +155,7 @@ def full_copy_academic(source_name, target_name):
 
         # --- 6. COPY ENROLLMENTS ---
         print("\n4. COPY: Enrollments...")
-        enroll_count = 0
+        enroll_count: int = 0
         for enroll in Enrollment.objects.filter(course__institution=source_inst):
             if enroll.student.id in user_map and enroll.course.id in course_map:
                 Enrollment.objects.create(

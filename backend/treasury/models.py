@@ -47,7 +47,7 @@ class StudentAccount(models.Model):
     """
     student = models.OneToOneField(User, on_delete=models.CASCADE, related_name='account', limit_choices_to={'role': 'STUDENT'})
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -96,11 +96,11 @@ class Invoice(models.Model):
     client_email = models.EmailField(blank=True)
 
     # Totals
-    subtotal_0 = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    subtotal_15 = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    iva_total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    total = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    subtotal_0 = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    subtotal_15 = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    iva_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 
     payment_method = models.ForeignKey(PaymentMethod, on_delete=models.SET_NULL, null=True)
     transaction_reference = models.CharField(max_length=100, blank=True) # Check #, Transfer ID
@@ -158,3 +158,41 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment for {self.invoice.number} - ${self.amount_paid}"
+
+class CreditNote(models.Model):
+    STATUS_CHOICES = (
+        ('DRAFT', 'Borrador'),
+        ('ISSUED', 'Emitida'),
+        ('CANCELLED', 'Anulada'),
+    )
+    
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='credit_notes')
+    number = models.CharField(max_length=20, unique=True)
+    issue_date = models.DateField(auto_now_add=True)
+    reason = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Nota de Crédito #{self.number} - Factura {self.invoice.number}"
+
+class DebitNote(models.Model):
+    STATUS_CHOICES = (
+        ('DRAFT', 'Borrador'),
+        ('ISSUED', 'Emitida'),
+        ('CANCELLED', 'Anulada'),
+    )
+    
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='debit_notes')
+    number = models.CharField(max_length=20, unique=True)
+    issue_date = models.DateField(auto_now_add=True)
+    reason = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT')
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Nota de Débito #{self.number} - Factura {self.invoice.number}"

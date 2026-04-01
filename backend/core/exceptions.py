@@ -14,8 +14,10 @@ def custom_exception_handler(exc, context):
 
     # If response is None, then there was an unhandled exception (500)
     if response is None:
-        print(f"Unhandled Exception in {context['view'].__class__.__name__}:")
-        traceback.print_exc()
+        import logging
+        logger = logging.getLogger('django')
+        logger.error(f"Unhandled Exception in {context['view'].__class__.__name__}:")
+        logger.error(traceback.format_exc())
         
         return Response({
             'error': 'Internal Server Error',

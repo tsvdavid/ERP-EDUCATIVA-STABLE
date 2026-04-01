@@ -38,7 +38,53 @@ const purchaseService = {
     validateInvoice: async (id) => {
         const response = await api.post(`/purchases/invoices/${id}/validate/`, {});
         return response.data;
-    }
+    },
+    cancelInvoice: async (id) => {
+        const response = await api.post(`/purchases/invoices/${id}/cancel/`, {});
+        return response.data;
+    },
+
+    // Credit Notes
+    getCreditNotes: async () => {
+        const response = await api.get('/purchases/credit-notes/');
+        if (Array.isArray(response.data)) return response.data;
+        if (response.data && Array.isArray(response.data.results)) return response.data.results;
+        return [];
+    },
+    createCreditNote: async (data) => {
+        const response = await api.post('/purchases/credit-notes/', data);
+        return response.data;
+    },
+
+    // Debit Notes
+    getDebitNotes: async () => {
+        const response = await api.get('/purchases/debit-notes/');
+        if (Array.isArray(response.data)) return response.data;
+        if (response.data && Array.isArray(response.data.results)) return response.data.results;
+        return [];
+    },
+    createDebitNote: async (data) => {
+        const response = await api.post('/purchases/debit-notes/', data);
+        return response.data;
+    },
+
+    // Liquidations
+    getLiquidations: async () => {
+        const response = await api.get('/purchases/liquidations/');
+        return response.data;
+    },
+    getLiquidation: async (id) => {
+        const response = await api.get(`/purchases/liquidations/${id}/`);
+        return response.data;
+    },
+    createLiquidation: async (data) => {
+        const response = await api.post('/purchases/liquidations/', data);
+        return response.data;
+    },
+    cancelLiquidation: async (id) => {
+        const response = await api.post(`/purchases/liquidations/${id}/cancel/`);
+        return response.data;
+    },
 };
 
 export default purchaseService;

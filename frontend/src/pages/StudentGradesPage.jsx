@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import academicService from '../services/academicService';
-import { BookOpen, Award, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import treasuryService from '../services/treasuryService';
+import CheckoutModal from '../components/payments/CheckoutModal';
+import { BookOpen, Award, AlertCircle, ChevronDown, ChevronUp, DollarSign } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { useAuthStore } from '../context/authStore';
 
 const StudentGradesPage = () => {
+    const { user } = useAuthStore();
     const [loading, setLoading] = useState(true);
     const [enrollment, setEnrollment] = useState(null);
     const [course, setCourse] = useState(null);
     const [summary, setSummary] = useState({});
+    const [attendanceSummary, setAttendanceSummary] = useState(null);
     const [expandedSubject, setExpandedSubject] = useState(null);
+    const [charges, setCharges] = useState([]);
+    const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+    const [cartPayload, setCartPayload] = useState(null);
 
     useEffect(() => {
         loadData();
@@ -15,17 +24,21 @@ const StudentGradesPage = () => {
 
     const loadData = async () => {
         try {
-            const enrollments = await academicService.getEnrollments();
+            // First run both queries in parallel
+            const enrollmentsPromise = academicService.getEnrollments();
+            const chargesPromise = user?.id ? treasuryService.getCharges({ student_id: user.id, pending: 'true' }) : Promise.resolve([]);
 
-            if (enrollments.length === 0) {
-                setLoading(false);
-                return;
+            const [enrollments, chargesList] = await Promise.all([enrollmentsPromise, chargesPromise]);
+
+            setCharges(chargesList || []);
+
+            if (enrollments && enrollments.length > 0) {
+                const myEnrollment = enrollments[0];
+                setEnrollment(myEnrollment);
+                setCourse(myEnrollment.course_detail);
+                setSummary(myEnrollment.academic_summary || {});
+                setAttendanceSummary(myEnrollment.attendance_summary || null);
             }
-            const myEnrollment = enrollments[0];
-            setEnrollment(myEnrollment);
-            setCourse(myEnrollment.course_detail);
-            setSummary(myEnrollment.academic_summary || {});
-
         } catch (error) {
             console.error("Error loading student grades:", error);
         } finally {
@@ -33,13 +46,60 @@ const StudentGradesPage = () => {
         }
     };
 
+    const handlePayDebt = (charge) => {
+        const payload = {
+            student_id: user?.id,
+            amount: parseFloat(charge.amount),
+            currency: 'USD',
+            description: `Pago de: ${charge.concept_detail?.name || 'Deuda'}`,
+            reference_id: charge.id,
+            concepts: [
+                {
+                    concept_id: charge.concept_detail?.id,
+                    quantity: 1,
+                    charge_id: charge.id
+                }
+            ]
+        };
+        setCartPayload(payload);
+        setIsCheckoutOpen(true);
+    };
+
+    const onPaymentSuccess = () => {
+        setIsCheckoutOpen(false);
+        loadData(); // reload charges
+    };
+
     const getScoreColor = (score) => {
-        if (score === null || score === undefined || score === '-') return 'text-slate-400';
+        if (score === null || score === undefined || score === '-' || score === '') return 'text-slate-400';
         const num = parseFloat(score);
         if (isNaN(num)) return 'text-slate-500';
         if (num >= 9) return 'text-emerald-600 font-bold';
         if (num >= 7) return 'text-indigo-600 font-medium';
         return 'text-red-500 font-bold';
+    };
+
+    const getQualitativeGrade = (score, scaleType = 'QUALITATIVE_DESTREZAS') => {
+        if (score === null || score === undefined || score === '' || isNaN(score)) return '-';
+        const num = parseFloat(score);
+        
+        if (scaleType === 'QUALITATIVE_PROYECTOS') {
+            if (num >= 9) return 'EX';
+            if (num >= 7) return 'MB';
+            if (num >= 5) return 'B';
+            return 'R';
+        } else if (scaleType === 'QUALITATIVE_COMPORTAMIENTO') {
+            if (num >= 9) return 'A';
+            if (num >= 7) return 'B';
+            if (num >= 5) return 'C';
+            if (num >= 4) return 'D';
+            return 'E';
+        } else {
+            if (num >= 9) return 'DA';
+            if (num >= 7) return 'EP';
+            if (num >= 5) return 'I';
+            return 'NE';
+        }
     };
 
     const toggleExpand = (subjectId) => {
@@ -49,6 +109,26 @@ const StudentGradesPage = () => {
             setExpandedSubject(subjectId);
         }
     };
+
+    // --- CHART AND RECOMMENDATIONS LOGIC ---
+    const chartData = Object.entries(summary).map(([id, data]) => ({
+        subject: data.name,
+        score: parseFloat(data.final) || 0
+    }));
+
+    const recommendationsData = [];
+    Object.entries(summary).forEach(([id, data]) => {
+        const score = parseFloat(data.final);
+        if (!isNaN(score)) {
+            if (score >= 9) {
+                recommendationsData.push({ subject: data.name, type: 'success', message: '¡Excelente trabajo! Continúa reforzando estas habilidades.' });
+            } else if (score >= 7) {
+                recommendationsData.push({ subject: data.name, type: 'warning', message: 'Buen desempeño, esfuérzate un poco más para dominar los temas.' });
+            } else {
+                recommendationsData.push({ subject: data.name, type: 'danger', message: 'Alerta: Necesitas refuerzo académico. Busca apoyo con tu docente.' });
+            }
+        }
+    });
 
     if (loading) return <div className="p-8 text-center flex justify-center"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
@@ -116,9 +196,82 @@ const StudentGradesPage = () => {
                 </div>
             </div>
 
+            {/* Admin / My Account Section */}
+            <div className="bg-white rounded-xl shadow-md border border-slate-100 overflow-hidden mb-6">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                    <div className="flex items-center gap-2">
+                        <DollarSign size={18} className="text-indigo-600" />
+                        <h3 className="font-semibold text-slate-700">Administrativo / Mi Cuenta</h3>
+                    </div>
+                </div>
+                <div className="p-4 space-y-3">
+                    {charges.length === 0 ? (
+                        <p className="text-slate-500 italic text-sm">Estás al día. No hay facturas o deudas pendientes en este momento.</p>
+                    ) : (
+                        charges.map(charge => (
+                            <div key={charge.id} className="flex flex-col md:flex-row md:justify-between md:items-center bg-white p-4 rounded-lg border border-red-100 shadow-sm gap-4 md:gap-0">
+                                <div>
+                                    <p className="font-bold text-slate-800">{charge.concept_detail?.name || 'Deuda'}</p>
+                                    <p className="text-sm text-red-500">Vence: {charge.due_date}</p>
+                                </div>
+                                <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
+                                    <span className="font-bold text-slate-700 text-lg">${parseFloat(charge.amount).toFixed(2)}</span>
+                                    <button
+                                        onClick={() => handlePayDebt(charge)}
+                                        className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 shadow-md hover:shadow-lg shadow-indigo-200"
+                                    >
+                                        <DollarSign size={18} /> Pagar Ahora
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Payment Modal */}
+            {cartPayload && (
+                <CheckoutModal
+                    isOpen={isCheckoutOpen}
+                    onClose={() => setIsCheckoutOpen(false)}
+                    cartPayload={cartPayload}
+                    onPaymentSuccess={onPaymentSuccess}
+                />
+            )}
+
+            {/* Attendance Metrics */}
+            {attendanceSummary && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                        <span className="text-sm font-bold text-slate-400 uppercase mb-2">Asistencia Global</span>
+                        <span className={`text-3xl font-black ${attendanceSummary.percentage >= 80 ? 'text-emerald-500' : 'text-red-500'}`}>
+                            {attendanceSummary.percentage}%
+                        </span>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                        <span className="text-sm font-bold text-slate-400 uppercase mb-2">Días Laborados</span>
+                        <span className="text-3xl font-black text-slate-700">
+                            {attendanceSummary.total_classes}
+                        </span>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                        <span className="text-sm font-bold text-slate-400 uppercase mb-2">Faltas</span>
+                        <span className="text-3xl font-black text-rose-500">
+                            {attendanceSummary.absent}
+                        </span>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center hover:shadow-md transition-shadow">
+                        <span className="text-sm font-bold text-slate-400 uppercase mb-2">Atrasos</span>
+                        <span className="text-3xl font-black text-amber-500">
+                            {attendanceSummary.late}
+                        </span>
+                    </div>
+                </div>
+            )}
+
             {/* Grades Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[600px] sm:min-w-full">
                     <thead className="bg-slate-50 border-b border-slate-100">
                         <tr>
                             <th className="p-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Materia</th>
@@ -144,11 +297,11 @@ const StudentGradesPage = () => {
                                             </div>
                                             {data.name}
                                         </td>
-                                        <td className={`p-5 text-center ${getScoreColor(data.t1)}`}>{data.t1 || '-'}</td>
-                                        <td className={`p-5 text-center ${getScoreColor(data.t2)}`}>{data.t2 || '-'}</td>
-                                        <td className={`p-5 text-center ${getScoreColor(data.t3)}`}>{data.t3 || '-'}</td>
+                                        <td className={`p-5 text-center ${getScoreColor(data.t1)}`}>{data.effective_grading_type !== 'QUANTITATIVE' ? getQualitativeGrade(data.t1, data.effective_grading_type) : (data.t1 || '-')}</td>
+                                        <td className={`p-5 text-center ${getScoreColor(data.t2)}`}>{data.effective_grading_type !== 'QUANTITATIVE' ? getQualitativeGrade(data.t2, data.effective_grading_type) : (data.t2 || '-')}</td>
+                                        <td className={`p-5 text-center ${getScoreColor(data.t3)}`}>{data.effective_grading_type !== 'QUANTITATIVE' ? getQualitativeGrade(data.t3, data.effective_grading_type) : (data.t3 || '-')}</td>
                                         <td className="p-5 text-center font-bold text-indigo-700 bg-indigo-50/20">
-                                            {data.final || '-'}
+                                            {data.effective_grading_type !== 'QUANTITATIVE' ? getQualitativeGrade(data.final, data.effective_grading_type) : (data.final || '-')}
                                         </td>
                                     </tr>
                                     {/* Detailed View */}
@@ -173,7 +326,7 @@ const StudentGradesPage = () => {
                                                                                 <span className="text-slate-400 text-[10px]">{det.weight}% del promedio</span>
                                                                             </div>
                                                                             <span className={`font-medium ${getScoreColor(det.score)}`}>
-                                                                                {det.score !== null ? det.score : '-'}
+                                                                                {det.score !== null ? (data.effective_grading_type !== 'QUANTITATIVE' ? getQualitativeGrade(det.score, data.effective_grading_type) : det.score) : '-'}
                                                                             </span>
                                                                         </div>
                                                                     ))
@@ -200,6 +353,42 @@ const StudentGradesPage = () => {
                     <strong>Nota:</strong> Este reporte es parcial. Haz clic en una materia para ver el detalle de aportes por trimestre.
                 </p>
             </div>
+
+            {/* Performance Chart */}
+            {chartData.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Rendimiento Académico Acumulado</h3>
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                                <XAxis dataKey="subject" tick={{ fontSize: 12, fill: '#64748B' }} />
+                                <YAxis domain={[0, 10]} tick={{ fontSize: 12, fill: '#64748B' }} />
+                                <Tooltip cursor={{ fill: '#F1F5F9' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="score" fill="#4F46E5" radius={[4, 4, 0, 0]} name="Promedio" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* Recommendations */}
+            {recommendationsData.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-6 mb-8">
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Recomendaciones del Docente</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {recommendationsData.map((rec, index) => (
+                            <div key={index} className={`p-4 rounded-xl border-l-4 shadow-sm ${rec.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-800' :
+                                rec.type === 'warning' ? 'bg-amber-50 border-amber-500 text-amber-800' :
+                                    'bg-red-50 border-red-500 text-red-800'
+                                }`}>
+                                <h4 className="font-bold mb-1 text-sm">{rec.subject}</h4>
+                                <p className="text-sm opacity-90">{rec.message}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

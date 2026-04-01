@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod
+from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod, ClassSchedule
 from users.serializers import UserSerializer
 
 class AcademicPeriodSerializer(serializers.ModelSerializer):
@@ -35,6 +35,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     student_detail = UserSerializer(source='student', read_only=True)
     course_detail = CourseSerializer(source='course', read_only=True)
     academic_summary = serializers.SerializerMethodField()
+    attendance_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Enrollment
@@ -45,6 +46,37 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             return obj.calculate_averages()
         except Exception as e:
             # print(f"Error calculating averages: {e}")
+            return {}
+
+    def get_attendance_summary(self, obj):
+        try:
+            records = obj.attendance_records.all()
+            total = records.count()
+            if total == 0:
+                return {
+                    'total_classes': 0, 'present': 0, 'absent': 0,
+                    'late': 0, 'excused': 0, 'percentage': 100.0
+                }
+            
+            p = records.filter(status='PRESENT').count()
+            a = records.filter(status='ABSENT').count()
+            l = records.filter(status='LATE').count()
+            e = records.filter(status='EXCUSED').count()
+            
+            # Late or excused might count as partial or full present depend on rule,
+            # We assume Present + Late + Excused = Attended Classes for simple % calc:
+            attended = p + l + e 
+            percentage = round((attended / total) * 100, 2)
+            
+            return {
+                'total_classes': total,
+                'present': p,
+                'absent': a,
+                'late': l,
+                'excused': e,
+                'percentage': percentage
+            }
+        except Exception as e:
             return {}
 
 class GradeSerializer(serializers.ModelSerializer):
@@ -59,4 +91,13 @@ class GradeSerializer(serializers.ModelSerializer):
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
+        fields = '__all__'
+
+class ClassScheduleSerializer(serializers.ModelSerializer):
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    teacher_name = serializers.CharField(source='subject.teacher.get_full_name', read_only=True)
+    course_id = serializers.IntegerField(source='subject.course_id', read_only=True)
+
+    class Meta:
+        model = ClassSchedule
         fields = '__all__'

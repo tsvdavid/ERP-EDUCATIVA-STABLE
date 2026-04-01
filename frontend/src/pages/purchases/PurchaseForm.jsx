@@ -182,6 +182,19 @@ const PurchaseForm = () => {
                             <option value="02">02 - Costo o Gasto para declaración de Renta</option>
                         </select>
                     </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Método de Pago</label>
+                        <select
+                            name="payment_method"
+                            className="mt-1 block w-full border border-gray-300 rounded shadow-sm p-2"
+                            value={invoiceData.payment_method}
+                            onChange={handleHeaderChange}
+                        >
+                            <option value="01">01 - Efectivo (Sin utilización del sistema financiero)</option>
+                            <option value="19">19 - Tarjeta de crédito</option>
+                            <option value="20">20 - Otros con utilización del sistema financiero</option>
+                        </select>
+                    </div>
                 </div>
 
                 <hr className="my-6" />

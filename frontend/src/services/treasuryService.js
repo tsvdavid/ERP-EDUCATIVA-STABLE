@@ -61,6 +61,12 @@ const treasuryService = {
         return [];
     },
 
+    // Mass Billing
+    createMassBilling: async (payload) => {
+        const response = await api.post('/treasury/invoices/mass-billing/', payload);
+        return response.data;
+    },
+
     // Process Payment
     processPayment: async (paymentData) => {
         const response = await api.post('/treasury/invoices/process-payment/', paymentData);
@@ -92,6 +98,38 @@ const treasuryService = {
         return response.data;
     },
 
+    // Credit Notes
+    getCreditNotes: async () => {
+        const response = await api.get('/treasury/credit-notes/');
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
+    createCreditNote: async (data) => {
+        const response = await api.post('/treasury/credit-notes/', data);
+        return response.data;
+    },
+
+    // Debit Notes
+    getDebitNotes: async () => {
+        const response = await api.get('/treasury/debit-notes/');
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
+    createDebitNote: async (data) => {
+        const response = await api.post('/treasury/debit-notes/', data);
+        return response.data;
+    },
+
     // SRI
     sendToSri: async (invoiceId) => {
         const response = await api.post(`/treasury/invoices/${invoiceId}/send-sri/`);
@@ -102,6 +140,17 @@ const treasuryService = {
         const response = await api.get(`/treasury/invoices/${invoiceId}/download_xml/`, {
             responseType: 'blob'
         });
+        return response.data;
+    },
+    // New Reporting Methods
+    getFinancialStats: async (academicYearId = null, courseId = null) => {
+        let url = '/treasury/charges/financial-stats/';
+        const params = new URLSearchParams();
+        if (academicYearId) params.append('academic_year_id', academicYearId);
+        if (courseId) params.append('course_id', courseId);
+        const queryString = params.toString();
+        if (queryString) url += `?${queryString}`;
+        const response = await api.get(url);
         return response.data;
     }
 };

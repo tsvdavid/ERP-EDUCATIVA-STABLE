@@ -20,7 +20,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - ./backend/static:/app/static
       - ./backend/media:/app/media
@@ -35,6 +35,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: always
+    environment:
+      - API_PROXY_TARGET=http://backend:8000
     # In production, we should serve built static files via Nginx, 
     # but for simplicity in this setup, we keep the node server or use a multi-stage build.
     # Assuming the current Dockerfile runs 'npm run dev' or 'serve'. 

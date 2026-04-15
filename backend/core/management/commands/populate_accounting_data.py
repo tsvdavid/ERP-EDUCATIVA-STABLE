@@ -26,6 +26,10 @@ class Command(BaseCommand):
             self.stdout.write("Limpiando datos contables anteriores...")
             
             # 1. Delete transactions first (Dependent objects)
+            from purchases.models import PurchaseCreditNote, PurchaseDebitNote
+            PurchaseCreditNote.objects.filter(institution=institution).delete()
+            PurchaseDebitNote.objects.filter(institution=institution).delete()
+            
             PurchaseInvoice.objects.filter(institution=institution).delete() # Cascades to PurchaseItem
             Invoice.objects.filter(institution=institution).delete() # Cascades to InvoiceDetail, Payment
             Charge.objects.filter(institution=institution).delete()

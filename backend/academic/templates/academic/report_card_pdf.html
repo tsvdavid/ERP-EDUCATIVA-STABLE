@@ -8,6 +8,9 @@
             size: A4;
             margin: 2cm;
 
+            /* The @frame at-rule is a custom extension for xhtml2pdf (Pisa) used to define 
+               static layout regions like headers and footers. It is correctly handled by 
+               the PDF generator even if flagged as 'unknown' by standard CSS linters. */
             @frame footer_frame {
                 /* Static Frame */
                 -pdf-frame-content: footerContent;

@@ -1,10 +1,14 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Message, Notification, Notice, Holiday
-from .serializers import MessageSerializer, NotificationSerializer, NoticeSerializer, HolidaySerializer
-from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser # Added this import
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
+from .models import Message, Notification, Notice, Holiday
+from .serializers import (
+    MessageSerializer, NotificationSerializer, 
+    NoticeSerializer, HolidaySerializer
+)
+from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
@@ -127,7 +131,6 @@ class NoticeViewSet(viewsets.ModelViewSet):
                      # Check if teacher teaches any subject in this course
                      from academic.models import Subject
                      if not Subject.objects.filter(course=target_course, teacher=user).exists():
-                         from rest_framework.exceptions import PermissionDenied
                          raise PermissionDenied("No puedes enviar avisos a cursos donde no dictas clases.")
                 
                 target_role = serializer.validated_data.get('target_role', 'ALL') 
@@ -202,8 +205,7 @@ class NoticeViewSet(viewsets.ModelViewSet):
         except Exception as e:
             import traceback
             traceback.print_exc()
-            from rest_framework import serializers
-            raise serializers.ValidationError(f"Error creating alert: {str(e)}")
+            raise ValidationError(f"Error creating alert: {str(e)}")
 
 
 class HolidayViewSet(viewsets.ModelViewSet):

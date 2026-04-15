@@ -101,6 +101,113 @@ const learningService = {
     submitQuizAnswers: async (attemptId, answers) => {
         const response = await api.post(`/learning/quiz-attempts/${attemptId}/submit_answers/`, { answers });
         return response.data;
+    },
+
+    // Assignments
+    getAssignments: async (params) => {
+        const response = await api.get('/learning/assignments/', { params });
+        return response.data;
+    },
+    createAssignment: async (formData) => {
+        const response = await api.post('/learning/assignments/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
+    updateAssignment: async (id, data) => {
+        const response = await api.patch(`/learning/assignments/${id}/`, data);
+        return response.data;
+    },
+    deleteAssignment: async (id) => {
+        const response = await api.delete(`/learning/assignments/${id}/`);
+        return response.data;
+    },
+    submitAssignmentResponse: async (formData) => {
+        const response = await api.post('/learning/submissions/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return response.data;
+    },
+    getAssignmentSubmissions: async (assignmentId) => {
+        const response = await api.get(`/learning/submissions/?assignment_id=${assignmentId}`);
+        return response.data;
+    },
+    updateSubmission: async (id, data) => {
+        const response = await api.patch(`/learning/submissions/${id}/`, data);
+        return response.data;
+    },
+
+    // Gestión de Alumnos
+    getCourseEnrollments: async (courseId) => {
+        const response = await api.get(`/learning/enrollments/?course_id=${courseId}`);
+        if (Array.isArray(response.data)) return response.data;
+        if (response.data?.results) return response.data.results;
+        return [];
+    },
+    syncCourseStudents: async (courseId) => {
+        const response = await api.post(`/learning/courses/${courseId}/sync_students/`);
+        return response.data;
+    },
+    getCalendarEvents: async () => {
+        const response = await api.get('/learning/calendar/events/');
+        return response.data;
+    },
+    getInstructorStats: async () => {
+        const response = await api.get('/learning/instructor/stats/');
+        return response.data;
+    },
+    getUnifiedSubmissions: async (courseId = null) => {
+        const url = courseId ? `/learning/instructor/submissions/?course_id=${courseId}` : '/learning/instructor/submissions/';
+        const response = await api.get(url);
+        return response.data;
+    },
+    getGroups: async () => {
+        const response = await api.get('/learning/groups/');
+        return response.data;
+    },
+    createGroup: async (data) => {
+        const response = await api.post('/learning/groups/', data);
+        return response.data;
+    },
+    updateGroup: async (id, data) => {
+        const response = await api.patch(`/learning/groups/${id}/`, data);
+        return response.data;
+    },
+    deleteGroup: async (id) => {
+        const response = await api.delete(`/learning/groups/${id}/`);
+        return response.data;
+    },
+    getTags: async (groupId = null) => {
+        const url = groupId ? `/learning/tags/?group=${groupId}` : '/learning/tags/';
+        const response = await api.get(url);
+        return response.data;
+    },
+    createTag: async (data) => {
+        const response = await api.post('/learning/tags/', data);
+        return response.data;
+    },
+    updateTag: async (id, data) => {
+        const response = await api.patch(`/learning/tags/${id}/`, data);
+        return response.data;
+    },
+    deleteTag: async (id) => {
+        const response = await api.delete(`/learning/tags/${id}/`);
+        return response.data;
+    },
+    exportInstructorData: async (format, courseId = null) => {
+        const url = courseId 
+            ? `/learning/instructor/export/?format=${format}&course_id=${courseId}` 
+            : `/learning/instructor/export/?format=${format}`;
+        
+        const response = await api.get(url, { responseType: 'blob' });
+        
+        const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.setAttribute('download', `reporte_panel_docente.${format === 'excel' ? 'xlsx' : 'pdf'}`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
     }
 };
 

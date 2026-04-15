@@ -68,6 +68,7 @@ import GlobalReportsPage from './pages/academic/GlobalReportsPage';
 import CampusVirtualPage from './pages/learning/CampusVirtualPage';
 import CoursePlayerPage from './pages/learning/CoursePlayerPage';
 import InstructorDashboard from './pages/learning/InstructorDashboard';
+import LMSCalendar from './pages/learning/LMSCalendar';
 import ResourceCenterPage from './pages/knowledge/ResourceCenterPage';
 import AIConfigPage from './pages/admin/AIConfigPage';
 import MedicalDispensaryPage from './pages/health/MedicalDispensaryPage';
@@ -223,7 +224,9 @@ function App() {
               <Route path="admin/payment-gateways" element={<PaymentGatewaysConfigPage />} />
               <Route path="admin/ai-config" element={<AIConfigPage />} />
               <Route path="campus-virtual" element={<CampusVirtualPage />} />
+              <Route path="campus-virtual/calendario" element={<LMSCalendar />} />
               <Route path="campus-virtual/instructor" element={<InstructorDashboard />} />
+              <Route path="campus-virtual/player/:id" element={<CoursePlayerPage />} />
               <Route path="recursos" element={<ResourceCenterPage />} />
               <Route path="health/medical-dispensary" element={<MedicalDispensaryPage />} />
               <Route path="health/dece" element={<DecePage />} />

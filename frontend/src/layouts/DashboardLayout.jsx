@@ -140,6 +140,7 @@ const DashboardLayout = () => {
         
         // Portal Digital
         { section: 'Portal Digital', path: '/dashboard/campus-virtual', label: 'Campus Virtual', icon: MonitorPlay, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'STUDENT', 'PARENT'] },
+        { section: 'Portal Digital', path: '/dashboard/campus-virtual/instructor', label: 'Panel Docente', icon: Settings, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER'] },
         { section: 'Portal Digital', path: '/dashboard/recursos', label: 'Centro de Recursos', icon: Library, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'STUDENT', 'PARENT'] },
 
         // Administrativo

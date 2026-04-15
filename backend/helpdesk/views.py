@@ -93,6 +93,20 @@ class TicketViewSet(viewsets.ModelViewSet):
         # Logic to notify agent would go here
         return Response({'status': 'Ticket reopened'})
 
+    @action(detail=True, methods=['post'])
+    def take_ticket(self, request, pk=None):
+        ticket = self.get_object()
+        user = request.user
+        
+        if ticket.assigned_to:
+            return Response({'error': 'Ticket ya está asignado'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        ticket.assigned_to = user
+        if ticket.status == 'OPEN':
+             ticket.status = 'IN_PROGRESS'
+        ticket.save()
+        return Response({'status': 'Ticket asignado exitosamente', 'assigned_to': user.id})
+
 class WorkflowViewSet(viewsets.ModelViewSet):
     serializer_class = WorkflowSerializer
     permission_classes = [permissions.IsAdminUser]

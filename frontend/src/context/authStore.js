@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import api from '../services/api';
-import { jwtDecode } from "jwt-decode"; // Asegúrate de instalar jwt-decode si no está
+import { jwtDecode } from "jwt-decode"; 
 
 export const useAuthStore = create((set) => ({
     user: null,
@@ -35,6 +35,29 @@ export const useAuthStore = create((set) => ({
         }
     },
 
+    refresh: async () => {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (!refreshToken) return false;
+        try {
+            const response = await api.post('/auth/refresh/', { refresh: refreshToken });
+            const { access } = response.data;
+            localStorage.setItem('access_token', access);
+            const decoded = jwtDecode(access);
+            set({
+                user: decoded,
+                isAuthenticated: true,
+                activeInstitution: localStorage.getItem('active_institution') || decoded.institution
+            });
+            return true;
+        } catch (error) {
+            console.error('Error al refrescar token:', error);
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            set({ user: null, isAuthenticated: false, activeInstitution: null });
+            return false;
+        }
+    },
+
     logout: () => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
@@ -42,13 +65,22 @@ export const useAuthStore = create((set) => ({
         set({ user: null, isAuthenticated: false, activeInstitution: null });
     },
 
-    checkAuth: () => {
+    checkAuth: async () => {
         const token = localStorage.getItem('access_token');
+        const refreshToken = localStorage.getItem('refresh_token');
+
         if (token) {
             try {
                 const decoded = jwtDecode(token);
-                // Verificar expiración básica
-                if (decoded.exp * 1000 < Date.now()) {
+                // Si el token ha expirado o está cerca de hacerlo (ej: < 60s)
+                if (decoded.exp * 1000 < Date.now() + 60000) {
+                    if (refreshToken) {
+                        const success = await useAuthStore.getState().refresh();
+                        if (success) {
+                            set({ isLoading: false });
+                            return;
+                        }
+                    }
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
                     localStorage.removeItem('active_institution');
@@ -65,6 +97,9 @@ export const useAuthStore = create((set) => ({
             } catch (e) {
                 set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null });
             }
+        } else if (refreshToken) {
+            const success = await useAuthStore.getState().refresh();
+            set({ isLoading: false });
         } else {
             set({ isLoading: false });
         }

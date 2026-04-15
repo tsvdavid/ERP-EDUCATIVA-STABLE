@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod, ClassSchedule
+from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod, ClassSchedule, Observation
 from users.serializers import UserSerializer
 
 class AcademicPeriodSerializer(serializers.ModelSerializer):
@@ -23,10 +23,10 @@ class CourseSerializer(serializers.ModelSerializer):
 class EvaluationCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = EvaluationCategory
-        fields = '__all__'
+        fields = ('id', 'subject', 'name', 'weight', 'trimester')
 
 class SubjectSerializer(serializers.ModelSerializer):
-    evaluation_categories = EvaluationCategorySerializer(many=True, read_only=True)
+    # evaluation_categories = EvaluationCategorySerializer(many=True, read_only=True)
     class Meta:
         model = Subject
         fields = '__all__'
@@ -45,7 +45,6 @@ class EnrollmentSerializer(serializers.ModelSerializer):
         try:
             return obj.calculate_averages()
         except Exception as e:
-            # print(f"Error calculating averages: {e}")
             return {}
 
     def get_attendance_summary(self, obj):
@@ -63,8 +62,6 @@ class EnrollmentSerializer(serializers.ModelSerializer):
             l = records.filter(status='LATE').count()
             e = records.filter(status='EXCUSED').count()
             
-            # Late or excused might count as partial or full present depend on rule,
-            # We assume Present + Late + Excused = Attended Classes for simple % calc:
             attended = p + l + e 
             percentage = round((attended / total) * 100, 2)
             
@@ -100,4 +97,12 @@ class ClassScheduleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ClassSchedule
+        fields = '__all__'
+
+class ObservationSerializer(serializers.ModelSerializer):
+    student_detail = UserSerializer(source='student', read_only=True)
+    teacher_detail = UserSerializer(source='teacher', read_only=True)
+
+    class Meta:
+        model = Observation
         fields = '__all__'

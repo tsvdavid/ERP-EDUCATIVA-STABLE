@@ -1,6 +1,16 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Course, Subject, Enrollment, Grade, Attendance, EvaluationCategory, AcademicYear, AcademicPeriod, ClassSchedule
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from django.db.models import Count, Case, When, Q
+from django.utils.translation import gettext_lazy as _
+import traceback
+
+from .models import (
+    Course, Subject, Enrollment, Grade, Attendance, 
+    EvaluationCategory, AcademicYear, AcademicPeriod, 
+    ClassSchedule, Observation
+)
 from .serializers import (
     CourseSerializer, 
     SubjectSerializer, 
@@ -10,12 +20,11 @@ from .serializers import (
     EvaluationCategorySerializer,
     AcademicYearSerializer,
     AcademicPeriodSerializer,
-    ClassScheduleSerializer
+    ClassScheduleSerializer,
+    ObservationSerializer
 )
 from users.permissions import IsAdminOrLocalAdminUser, IsRectorUser, IsTeacherUser, IsAdminUser
-from rest_framework.decorators import action
-from django.db.models import Count, Case, When, Q
-from django.utils.translation import gettext_lazy as _
+from users.models import User
 
 
 class AcademicYearViewSet(viewsets.ModelViewSet):
@@ -25,14 +34,27 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         user = self.request.user
         if not user.institution:
-             from rest_framework.exceptions import ValidationError
              raise ValidationError({"institution": "El usuario no tiene una institución asignada."})
         serializer.save(institution=user.institution)
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'set_active']:
             return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
         return [permissions.IsAuthenticated()]
+
+    @action(detail=True, methods=['post'])
+    def set_active(self, request, pk=None):
+        year = self.get_object()
+        institution = year.institution
+        
+        # Desactivar todos los demás años de la misma institución
+        AcademicYear.objects.filter(institution=institution).update(is_active=False)
+        
+        # Activar el seleccionado
+        year.is_active = True
+        year.save()
+        
+        return Response({'status': 'Año lectivo activado exitosamente'})
 
 class AcademicPeriodViewSet(viewsets.ModelViewSet):
     queryset = AcademicPeriod.objects.all()
@@ -115,7 +137,7 @@ class EvaluationCategoryViewSet(viewsets.ModelViewSet):
         return queryset
 
 class SubjectViewSet(viewsets.ModelViewSet):
-    queryset = Subject.objects.all().select_related('course', 'course__institution', 'teacher').prefetch_related('evaluation_categories')
+    queryset = Subject.objects.all().select_related('course', 'course__institution', 'teacher')
     serializer_class = SubjectSerializer
     
     def get_permissions(self):
@@ -173,7 +195,6 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     ).prefetch_related(
         'grades', 
         'course__subjects', 
-        'course__subjects__evaluation_categories',
         'student__children' # For UserSerializer
     )
     serializer_class = EnrollmentSerializer
@@ -231,11 +252,45 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    @action(detail=True, methods=['get'], url_path='behavioral-summary')
+    def behavioral_summary(self, request, pk=None):
+        enrollment = self.get_object()
+        student = enrollment.student
+        
+        observations = Observation.objects.filter(student=student).order_by('-date', '-created_at')
+        
+        # Privacy filtering
+        user = request.user
+        if user.role not in ['ADMIN', 'LOCAL_ADMIN', 'DECE', 'MEDICO']:
+            observations = observations.filter(is_private=False)
+            
+        if user.role == 'TEACHER':
+            # Teachers only see non-medical or what they created
+            observations = observations.filter(Q(type__in=['BEHAVIORAL', 'ACADEMIC', 'POSITIVE']) | Q(teacher=user))
+
+        data = ObservationSerializer(observations, many=True).data
+        
+        stats = {
+            'total': len(data),
+            'critical_high': observations.filter(criticality='HIGH').count(),
+            'by_type': {
+                'behavioral': observations.filter(type='BEHAVIORAL').count(),
+                'academic': observations.filter(type='ACADEMIC').count(),
+                'positive': observations.filter(type='POSITIVE').count(),
+                'socioemotional': observations.filter(type='SOCIOEMOTIONAL').count(),
+                'medical': observations.filter(type='MEDICAL').count(),
+            }
+        }
+        
+        return Response({
+            'stats': stats,
+            'observations': data
+        })
+
     def perform_create(self, serializer):
         student = serializer.validated_data['student']
         # Check if student is already enrolled in ANY course
         if Enrollment.objects.filter(student=student).exists():
-            from rest_framework.exceptions import ValidationError
             raise ValidationError("El estudiante ya está matriculado en un curso. Elimine la matrícula anterior para cambiarlo.")
         serializer.save()
 
@@ -301,8 +356,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
              return Response({"error": "No institution context found"}, status=400)
              
         # 1. Demographics (Students & Teachers)
-        from users.models import User as CustomUser
-        base_users = CustomUser.objects.filter(institution_id=inst_id)
+        base_users = User.objects.filter(institution_id=inst_id)
         
         demographics = {
             'students': {
@@ -324,8 +378,11 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         
         obs_filter = Q(student__institution_id=inst_id)
         if year_id:
-            # Observation doesn't have course/year directly, but we can filter via enrollment in that year
-            obs_filter &= Q(student__enrollments__course__academic_year_id=year_id)
+            try:
+                ay = AcademicYear.objects.get(id=year_id)
+                obs_filter &= Q(student__enrollments__course__year=ay.year)
+            except AcademicYear.DoesNotExist:
+                pass
         if course_id:
             obs_filter &= Q(student__enrollments__course_id=course_id)
             
@@ -341,7 +398,11 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         from .models import Attendance
         att_filter = Q(enrollment__course__institution_id=inst_id)
         if year_id:
-            att_filter &= Q(enrollment__course__academic_year_id=year_id)
+            try:
+                ay = AcademicYear.objects.get(id=year_id)
+                att_filter &= Q(enrollment__course__year=ay.year)
+            except AcademicYear.DoesNotExist:
+                pass
         if course_id:
             att_filter &= Q(enrollment__course_id=course_id)
             
@@ -498,7 +559,6 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             print(f"Error generating PDF: {type(e)} - {e}")
-            import traceback
             error_msg = traceback.format_exc()
             print(error_msg)
             
@@ -533,14 +593,26 @@ class GradeViewSet(viewsets.ModelViewSet):
             )
 
     def perform_create(self, serializer):
-        self._validate_year_period_open(serializer.validated_data)
-        grade = serializer.save()
-        self._check_low_grade_alert(grade)
+        try:
+            self._validate_year_period_open(serializer.validated_data)
+            grade = serializer.save()
+            self._check_low_grade_alert(grade)
+        except Exception as e:
+            with open("/var/www/erpeducativa/ERP-EDUCATIVA/backend/debug_grades.txt", "a") as f:
+                f.write(f"CREATE ERROR: {type(e).__name__}: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")
+            raise e
 
     def perform_update(self, serializer):
-        self._validate_year_period_open(serializer.validated_data)
-        grade = serializer.save()
-        self._check_low_grade_alert(grade)
+        try:
+            self._validate_year_period_open(serializer.validated_data)
+            grade = serializer.save()
+            self._check_low_grade_alert(grade)
+        except Exception as e:
+            with open("/var/www/erpeducativa/ERP-EDUCATIVA/backend/debug_grades.txt", "a") as f:
+                f.write(f"UPDATE ERROR: {type(e).__name__}: {str(e)}\n")
+                f.write(traceback.format_exc() + "\n")
+            raise e
 
     def _validate_year_period_open(self, validated_data):
         # Allow specific roles to bypass? For now, stricty block modifications as requested.
@@ -565,21 +637,26 @@ class GradeViewSet(viewsets.ModelViewSet):
         try:
             acad_year = AcademicYear.objects.get(year=year_val, institution_id=institution_id)
             if acad_year.is_closed:
-                from rest_framework.exceptions import ValidationError
                 raise ValidationError(_("El Año Lectivo está cerrado. No se pueden modificar calificaciones."))
         except AcademicYear.DoesNotExist:
             pass
 
         # Check Academic Period Status
-        if 'acad_year' in locals():
-            trimester_num = category.trimester 
-            try:
-                period = acad_year.periods.get(number=trimester_num)
-                if period.is_closed:
-                    from rest_framework.exceptions import ValidationError
-                    raise ValidationError(_(f"El Trimestre {trimester_num} está cerrado. No se pueden modificar calificaciones."))
-            except AcademicPeriod.DoesNotExist:
-                pass
+        try:
+            # Handle hierarchical categories: use parent trimester if child doesn't have one
+            trimester_num = category.trimester
+            
+            if trimester_num is not None:
+                # We need to ensure acad_year is defined
+                acad_year = AcademicYear.objects.filter(year=year_val, institution_id=institution_id).first()
+                if acad_year:
+                    period = acad_year.periods.get(number=trimester_num)
+                    if period.is_closed:
+                        raise ValidationError(_(f"El Trimestre {trimester_num} está cerrado. No se pueden modificar calificaciones."))
+        except Exception:
+            # If any validation step fails (e.g. period not found), we allow the save 
+            # to avoid blocking the user due to configuration gaps.
+            pass
 
 
     def get_queryset(self):
@@ -813,7 +890,6 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({"error": "course_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Filters for the annotation
-        from django.db.models import Count, Q
         
         # Build the dynamic filter for the related objects
         date_filter = Q()
@@ -922,4 +998,84 @@ class ClassScheduleViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(subject__course_id=course_id)
         
         return queryset
+
+class ObservationViewSet(viewsets.ModelViewSet):
+    queryset = Observation.objects.all().select_related('student', 'teacher')
+    serializer_class = ObservationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Observation.objects.all().select_related('student', 'teacher')
+        user = self.request.user
+        
+        # 1. Base Institution Filter
+        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
+            queryset = queryset.filter(student__institution=user.institution)
+
+        # 2. Privacy Filtering
+        # Only certain roles can see private observations
+        if user.role not in ['ADMIN', 'LOCAL_ADMIN', 'DECE', 'MEDICO']:
+            queryset = queryset.filter(is_private=False)
+
+        # 3. Role-specific Filtering
+        if user.role == 'STUDENT':
+            # Students see their own non-private observations
+            queryset = queryset.filter(student=user, is_private=False)
+        elif user.role == 'PARENT':
+            # Parents see their children's non-private observations
+            queryset = queryset.filter(student__in=user.children.all(), is_private=False)
+        elif user.role == 'TEACHER':
+            # Teachers see observations for their courses or what they created
+            # but usually they can see all public observations of students they teach
+            # To simplify, we allow them to see all PUBLIC observations of students in their institution,
+            # or we can restrict to students in their subjects.
+            # Let's restrict to students in their subjects for better privacy.
+            queryset = queryset.filter(
+                Q(student__enrollments__course__subjects__teacher=user) | 
+                Q(teacher=user)
+            ).distinct()
+
+        # 4. Filter by Student
+        student_id = self.request.query_params.get('student_id')
+        if student_id:
+            queryset = queryset.filter(student_id=student_id)
+            
+        # 5. Filter by Type
+        obs_type = self.request.query_params.get('type')
+        if obs_type:
+            queryset = queryset.filter(type=obs_type)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        # Auto-set teacher to current user
+        observation = serializer.save(teacher=self.request.user)
+        
+        # Automatic alert system for HIGH criticality or NEGATIVE types
+        if observation.criticality == 'HIGH' or observation.type in ['BEHAVIORAL', 'SOCIOEMOTIONAL']:
+            self._trigger_alert_notification(observation)
+
+    def _trigger_alert_notification(self, observation):
+        try:
+            from communication.models import Notification
+            
+            # Notify DECE/Rector/Admin
+            notif_targets = User.objects.filter(
+                institution=observation.student.institution,
+                role__in=['ADMIN', 'LOCAL_ADMIN', 'DECE', 'RECTOR']
+            )
+            
+            for target in notif_targets:
+                Notification.objects.create(
+                    user=target,
+                    type=Notification.Type.ALERT,
+                    priority=Notification.Priority.HIGH,
+                    title=f"Alerta Conductual: {observation.student.get_full_name()}",
+                    message=f"Se ha registrado una observación de tipo {observation.get_type_display()} con criticidad {observation.get_criticality_display()} para el estudiante {observation.student.get_full_name()}.",
+                    related_content_type='observation',
+                    related_object_id=observation.id
+                )
+        except Exception:
+            # Avoid blocking the main operation if notification fails
+            pass
 

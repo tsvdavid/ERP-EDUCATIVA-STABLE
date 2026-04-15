@@ -104,7 +104,7 @@ class User(AbstractUser):
         default=''
     )
 
-    # Contact Fields
+    # Campos de contacto (Re-activados para coincidir con la base de datos)
     representative_name = models.CharField(max_length=255, blank=True, default='')
     representative_cedula = models.CharField(max_length=20, blank=True, default='')
     representative_email = models.EmailField(blank=True, default='')

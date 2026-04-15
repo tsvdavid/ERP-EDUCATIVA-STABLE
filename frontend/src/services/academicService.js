@@ -54,6 +54,7 @@ const academicService = {
         let url = '/academic/enrollments/';
         const params = new URLSearchParams();
         if (courseId) params.append('course_id', courseId);
+        params.append('limit', '5000');
         if (studentId) params.append('student_id', studentId);
 
         // Agregar parámetro para obtener lista completa sin que DRF corte a 10/50 registros por página
@@ -89,6 +90,7 @@ const academicService = {
         if (subjectId) params.append('subject_id', subjectId);
         if (studentId) params.append('student_id', studentId);
         if (courseId) params.append('course_id', courseId);
+        params.append('limit', '5000');
 
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
@@ -108,6 +110,10 @@ const academicService = {
     },
     updateGrade: async (id, data) => {
         const response = await api.put(`/academic/grades/${id}/`, data);
+        return response.data;
+    },
+    patchGrade: async (id, data) => {
+        const response = await api.patch(`/academic/grades/${id}/`, data);
         return response.data;
     },
     deleteGrade: async (id) => {
@@ -205,6 +211,7 @@ const academicService = {
         const params = new URLSearchParams();
         if (level) params.append('level', level);
         if (courseId) params.append('course_id', courseId);
+        params.append('limit', '5000');
         if (academicYearId) params.append('academic_year_id', academicYearId);
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
@@ -216,6 +223,7 @@ const academicService = {
         const params = new URLSearchParams();
         if (academicYearId) params.append('academic_year_id', academicYearId);
         if (courseId) params.append('course_id', courseId);
+        params.append('limit', '5000');
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
         const response = await api.get(url);

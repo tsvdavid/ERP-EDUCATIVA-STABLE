@@ -9,12 +9,8 @@ class InstitutionSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'second_name', 'last_name', 'second_surname', 'cedula', 'photo', 'role', 'institution', 'phone', 'secondary_phone', 'address', 'birth_date', 'gender', 'notes', 'nationality', 'civil_status', 'titles', 'teaching_category', 'children', 'representative_name', 'representative_cedula', 'representative_email', 'representative_address', 'use_representative_for_billing')
+        fields = ('id', 'username', 'email', 'first_name', 'second_name', 'last_name', 'second_surname', 'cedula', 'photo', 'role', 'is_staff', 'is_superuser', 'institution', 'phone', 'secondary_phone', 'address', 'birth_date', 'gender', 'notes', 'nationality', 'civil_status', 'titles', 'teaching_category', 'children')
         read_only_fields = ('id',)
-        extra_kwargs = {
-            'password': {'write_only': True},
-            'photo': {'required': False}
-        }
     
     def to_representation(self, instance):
         response = super().to_representation(instance)
@@ -33,7 +29,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'username', 'password', 'email', 'first_name', 'second_name', 'last_name', 'second_surname', 'cedula', 'photo', 'role', 'institution', 'phone', 'secondary_phone', 'address', 'birth_date', 'gender', 'notes', 'nationality', 'civil_status', 'titles', 'teaching_category', 'representative_name', 'representative_cedula', 'representative_email', 'representative_address', 'use_representative_for_billing')
+        fields = ('id', 'username', 'password', 'email', 'first_name', 'second_name', 'last_name', 'second_surname', 'cedula', 'photo', 'role', 'institution', 'phone', 'secondary_phone', 'address', 'birth_date', 'gender', 'notes', 'nationality', 'civil_status', 'titles', 'teaching_category')
     
     def validate(self, data):
         request = self.context.get('request')

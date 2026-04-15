@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
     MonitorPlay, Search, BookOpen, Star, 
     ChevronRight, Play, Clock, Users,
-    Trophy, Layout, Filter, Sparkles, Settings, ShieldCheck
+    Trophy, Layout, Filter, Sparkles, Settings, ShieldCheck,
+    Calendar as CalendarIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../context/authStore';
@@ -17,6 +18,7 @@ const CampusVirtualPage = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('marketplace'); // 'marketplace', 'my-courses'
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterCategory, setFilterCategory] = useState(''); // Filtro por Grado/Nivel
 
     useEffect(() => {
         fetchData();
@@ -38,6 +40,19 @@ const CampusVirtualPage = () => {
         }
     };
 
+    // Lógica de Filtrado Local (React-Side)
+    const filteredCourses = courses.filter(course => {
+        const matchesSearch = course.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                             (course.subtitle && course.subtitle.toLowerCase().includes(searchTerm.toLowerCase()));
+        
+        const matchesCategory = filterCategory ? course.academic_course_name === filterCategory : true;
+        
+        return matchesSearch && matchesCategory;
+    });
+
+    // Extraer categorías únicas para el selector de filtros
+    const availableCategories = [...new Set(courses.map(c => c.academic_course_name).filter(Boolean))].sort();
+
     const handleEnroll = async (courseId) => {
         try {
             await learningService.enrollInCourse(courseId);
@@ -51,9 +66,19 @@ const CampusVirtualPage = () => {
     const renderHeader = () => (
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 lg:p-16 rounded-[2rem] lg:rounded-[4rem] shadow-2xl relative overflow-hidden mb-12 border border-white/5">
             <div className="relative z-10 max-w-3xl">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 backdrop-blur-md rounded-full text-indigo-400 text-[10px] lg:text-xs font-black uppercase tracking-widest mb-4 lg:mb-6 border border-indigo-500/20">
-                    <Sparkles size={14} />
-                    <span>Plataforma de Aprendizaje Pro</span>
+                <div className="flex items-center gap-4 mb-4 lg:mb-6">
+                    <button 
+                        onClick={() => navigate('/dashboard')}
+                        className="px-4 py-2 bg-white/10 backdrop-blur-md rounded-full text-white text-[10px] lg:text-xs font-black uppercase tracking-widest border border-white/10 hover:bg-white/20 transition-all flex items-center gap-2"
+                    >
+                        <Layout size={14} />
+                        <span>Volver al Dashboard</span>
+                    </button>
+                    <div className="h-4 w-px bg-white/10"></div>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 backdrop-blur-md rounded-full text-indigo-400 text-[10px] lg:text-xs font-black uppercase tracking-widest border border-indigo-500/20">
+                        <Sparkles size={14} />
+                        <span>Plataforma de Aprendizaje Pro</span>
+                    </div>
                 </div>
                 <h1 className="text-3xl md:text-5xl lg:text-7xl font-black text-white tracking-tighter mb-4 lg:mb-6 leading-none">
                     Campus Virtual <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Eduka360</span>
@@ -81,12 +106,20 @@ const CampusVirtualPage = () => {
                     {isAdminOrTeacher && (
                         <button 
                             onClick={() => navigate('/dashboard/campus-virtual/instructor')}
-                            className="px-8 py-4 bg-emerald-500/20 backdrop-blur-md text-emerald-400 rounded-2xl font-black border border-emerald-500/30 hover:bg-emerald-500/30 transition-all flex items-center gap-3"
+                            className="px-8 py-4 bg-emerald-500/10 backdrop-blur-md text-emerald-400 rounded-2xl font-black border border-emerald-500/30 hover:bg-emerald-500/20 transition-all flex items-center gap-3"
                         >
                             <Settings size={20} />
-                            Gestionar Cursos
+                            Panel Instructor
                         </button>
                     )}
+
+                    <button 
+                        onClick={() => navigate('/dashboard/campus-virtual/calendario')}
+                        className="px-8 py-4 bg-white/5 backdrop-blur-md text-white rounded-2xl font-black border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3"
+                    >
+                        <CalendarIcon size={20} />
+                        Cronograma
+                    </button>
                 </div>
             </div>
             
@@ -102,24 +135,42 @@ const CampusVirtualPage = () => {
     const renderMarketplace = () => (
         <div className="space-y-12">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
+                <div className="flex-grow">
                     <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Cursos Disponibles</h2>
-                    <p className="text-slate-400 font-medium font-medium">Encuentra el conocimiento que necesitas para el siguiente nivel.</p>
+                    <p className="text-slate-400 font-medium">Filtra por materia o grado para encontrar tu aula.</p>
                 </div>
-                <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
-                    <input 
-                        type="text" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Buscar por curso, tema o instructor..." 
-                        className="w-full md:w-96 bg-white border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 transition-all font-semibold shadow-sm"
-                    />
+                <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                    {/* Selector de Grados */}
+                    <div className="relative">
+                        <Filter className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <select 
+                            value={filterCategory}
+                            onChange={(e) => setFilterCategory(e.target.value)}
+                            className="pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-slate-700 font-semibold focus:border-indigo-500 outline-none appearance-none cursor-pointer min-w-[200px]"
+                        >
+                            <option value="">Filtrar: Todos los Grados</option>
+                            {availableCategories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Buscador General */}
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={20} />
+                        <input 
+                            type="text" 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            placeholder="Buscar curso o tema..." 
+                            className="w-full md:w-80 bg-white border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 transition-all font-semibold shadow-sm"
+                        />
+                    </div>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
-                {courses.map(course => (
+                {filteredCourses.map(course => (
                     <div key={course.id} className="group bg-white rounded-[2rem] lg:rounded-[3rem] overflow-hidden border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all">
                         <div className="h-56 relative overflow-hidden">
                             <img 

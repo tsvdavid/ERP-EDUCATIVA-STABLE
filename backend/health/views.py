@@ -403,6 +403,35 @@ class StudentRiskProfileViewSet(viewsets.ReadOnlyModelViewSet):
             'in_progress_cases': case_qs.filter(status='IN_PROGRESS').count(),
         })
 
+    @action(detail=False, methods=['get'], url_path='critical-alerts')
+    def critical_alerts(self, request):
+        """Devuelve todos los estudiantes con riesgo ROJO en la institución activa."""
+        user = request.user
+        institution = getattr(user, 'institution', None)
+        header_inst_id = request.headers.get('X-Institution-ID')
+        
+        target_inst_id = None
+        if institution:
+            target_inst_id = institution.id
+        elif header_inst_id:
+            target_inst_id = header_inst_id
+            
+        if not target_inst_id:
+            return Response({'error': 'No institution provided'}, status=400)
+            
+        qs = StudentRiskProfile.objects.select_related('student', 'academic_year').filter(
+            overall_risk='RED',
+            student__institution_id=target_inst_id
+        )
+        
+        # Filtro opcional por año
+        year_id = request.query_params.get('academic_year')
+        if year_id:
+            qs = qs.filter(academic_year_id=year_id)
+            
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], url_path='recalculate-all')
     def recalculate_all(self, request):
         """Recalcular semáforo de todos los estudiantes del año activo."""

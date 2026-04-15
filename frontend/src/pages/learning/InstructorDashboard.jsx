@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
-    Plus, Edit, Trash2, BookOpen, 
-    Users, DollarSign, Settings, Save,
-    X, ChevronRight, Layout, BarChart3,
-    Video, FileText, Link, ChevronDown, 
-    ChevronUp, MoreVertical, CheckCircle2,
-    Calendar, Trophy, HelpCircle
+    FileDown, FileText, Plus, BookOpen, Users, 
+    ArrowRight, Star, Clock, Trash2, Edit, Edit3,
+    ChevronRight, ChevronDown, CheckCircle, CheckCircle2, Info, Sparkles,
+    Layout, Filter, Settings, ShieldCheck, Tag, PlusCircle,
+    LayoutDashboard, BarChart3, X, Video, Trophy, Save, Download, Link, Calendar
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import learningService from '../../services/learningService';
+import academicService from '../../services/academicService';
 
 const InstructorDashboard = () => {
+    const navigate = useNavigate();
     const [courses, setCourses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
@@ -24,17 +26,134 @@ const InstructorDashboard = () => {
     });
     const [managingCourse, setManagingCourse] = useState(null);
     const [activeModule, setActiveModule] = useState(null);
-    const [activeTab, setActiveTab] = useState('content');
+    const [activeTab, setActiveTab] = useState('dashboard'); // Default to dashboard
+    const [user, setUser] = useState(null);
+
+    useEffect(() => {
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            const parsedUser = JSON.parse(userData);
+            console.log("EDUKA_DEBUG - Datos de Usuario:", parsedUser); // Log para diagnóstico
+            setUser(parsedUser);
+        }
+    }, []);
+
     const [quizData, setQuizData] = useState({ title: '', questions: [], passing_score: 70 });
+    const [assignmentData, setAssignmentData] = useState({ title: '', description: '', due_date: '', max_score: 10 });
+    const [isAddingAssignment, setIsAddingAssignment] = useState(false);
+    const [editingAssignment, setEditingAssignment] = useState(null);
+    const [submissions, setSubmissions] = useState([]);
+    const [isViewingSubmissions, setIsViewingSubmissions] = useState(false);
+    const [selectedAssignmentSub, setSelectedAssignmentSub] = useState(null);
+    const [gradingData, setGradingData] = useState({ score: '', teacher_feedback: '' });
+    const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
+    const [courseGroups, setCourseGroups] = useState([]);
+    const [tags, setTags] = useState([]);
+    const [selectedGroup, setSelectedGroup] = useState('');
+    const [courseGroupFilter, setCourseGroupFilter] = useState('all');
+    const [courseEnrollments, setCourseEnrollments] = useState([]);
+    const [isSyncingStudents, setIsSyncingStudents] = useState(false);
+    const [unifiedSubmissions, setUnifiedSubmissions] = useState([]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [evaluationCategories, setEvaluationCategories] = useState([]);
+    const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+    const [newGroup, setNewGroup] = useState({ name: '', description: '', icon: 'Tag' });
+    const [isCreatingTag, setIsCreatingTag] = useState(false);
+    const [newTag, setNewTag] = useState({ group: '', name: '', description: '' });
+    const [stats, setStats] = useState({
+        total_courses: 0,
+        total_students: 0,
+        active_students: 0,
+        pending_assignments: 0,
+        active_year_name: 'N/A'
+    });
+
+    // Validar si el usuario tiene privilegios administrativos
+    const checkIsAdmin = (u) => {
+        if (!u) return false;
+        // Detección ultra-permisiva para asegurar visualización
+        const r = String(u.role || u.role_name || '').toUpperCase();
+        const isStaff = u.is_staff === true || u.is_superuser === true || u.username === 'admin';
+        const isAdminRole = r.includes('ADMIN') || r.includes('ADMINISTRADOR');
+        return isAdminRole || isStaff;
+    };
+
+    const isAdmin = checkIsAdmin(user);
 
     useEffect(() => {
         fetchCourses();
+        fetchStats();
+        fetchGroups();
     }, []);
+
+    const fetchGroups = async () => {
+        try {
+            const [groups, allTags] = await Promise.all([
+                learningService.getGroups(),
+                learningService.getTags()
+            ]);
+            setCourseGroups(groups);
+            setTags(allTags);
+        } catch (error) {
+            console.error("Error fetching groups:", error);
+        }
+    };
+
+    const fetchTagsByGroup = async (groupId) => {
+        try {
+            const data = await learningService.getTags(groupId);
+            setTags(data);
+        } catch (error) {
+            console.error("Error fetching tags:", error);
+        }
+    };
+
+    useEffect(() => {
+        if (selectedGroup) {
+            fetchTagsByGroup(selectedGroup);
+        }
+    }, [selectedGroup]);
+
+    const fetchStats = async () => {
+        try {
+            const data = await learningService.getInstructorStats();
+            setStats(data);
+        } catch (error) {
+            console.error("Error fetching stats:", error);
+        }
+    };
+
+    const fetchUnifiedSubmissions = async (courseId = null) => {
+        try {
+            const data = await learningService.getUnifiedSubmissions(courseId);
+            setUnifiedSubmissions(data);
+        } catch (error) {
+            console.error("Error fetching unified submissions:", error);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'all_submissions') {
+            fetchUnifiedSubmissions();
+        }
+    }, [activeTab]);
+
+    const handleExport = async (format) => {
+        try {
+            setIsExporting(true);
+            await learningService.exportInstructorData(format);
+        } catch (error) {
+            console.error(`Error exporting ${format}:`, error);
+            alert('Error al generar el reporte');
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     const fetchCourses = async () => {
         try {
             setLoading(true);
-            const data = await learningService.getCourses();
+            const data = await learningService.getCourses(); // Instructor filter is handled by backend get_queryset or params
             setCourses(data);
         } catch (error) {
             console.error("Error fetching instructor courses:", error);
@@ -45,17 +164,23 @@ const InstructorDashboard = () => {
 
     const handleSaveCourse = async () => {
         try {
+            const courseData = {
+                ...newCourse,
+                tag_id: newCourse.tag_id || null
+            };
             if (editingCourse) {
-                await learningService.updateCourse(editingCourse.id, newCourse);
+                await learningService.updateCourse(editingCourse.id, courseData);
             } else {
-                await learningService.createCourse(newCourse);
+                await learningService.createCourse(courseData);
             }
             setIsCreating(false);
             setEditingCourse(null);
+            setSelectedGroup('');
             setNewCourse({ title: '', subtitle: '', description: '', price: 0, is_public: false, is_active: true });
             fetchCourses();
         } catch (error) {
             console.error("Error saving course:", error);
+            alert("Error al guardar el curso. Verifique los campos obligatorios.");
         }
     };
 
@@ -72,6 +197,50 @@ const InstructorDashboard = () => {
     
     const [editingLesson, setEditingLesson] = useState(null);
     const [isAddingLesson, setIsAddingLesson] = useState(false);
+
+    useEffect(() => {
+        if ((isAddingAssignment || editingAssignment) && managingCourse?.subject) {
+            fetchAcademicCategories(managingCourse.subject);
+        }
+    }, [isAddingAssignment, editingAssignment, managingCourse]);
+
+    const fetchAcademicCategories = async (subjectId) => {
+        try {
+            const categories = await academicService.getEvaluationCategories(subjectId);
+            setEvaluationCategories(categories);
+        } catch (error) {
+            console.error("Error fetching academic categories:", error);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'students' && managingCourse) {
+            fetchCourseEnrollments();
+        }
+    }, [activeTab, managingCourse]);
+
+    const fetchCourseEnrollments = async () => {
+        try {
+            const data = await learningService.getCourseEnrollments(managingCourse.id);
+            setCourseEnrollments(data);
+        } catch (error) {
+            console.error("Error fetching course enrollments:", error);
+        }
+    };
+
+    const handleSyncStudents = async () => {
+        try {
+            setIsSyncingStudents(true);
+            const result = await learningService.syncCourseStudents(managingCourse.id);
+            alert(`Sincronización completada. ${result.new_enrollments} alumnos nuevos añadidos.`);
+            fetchCourseEnrollments();
+        } catch (error) {
+            console.error("Error syncing students:", error);
+            alert("Error al sincronizar alumnos.");
+        } finally {
+            setIsSyncingStudents(false);
+        }
+    };
 
     const handleAddModule = async () => {
         const title = prompt('Título del nuevo módulo:');
@@ -146,58 +315,581 @@ const InstructorDashboard = () => {
             alert('Quiz guardado exitosamente');
         } catch (error) {
             console.error("Error saving quiz:", error);
+            alert('Error al guardar el quiz. Revisa la consola.');
         }
     };
+
+    const handleSaveAssignment = async (e) => {
+        e.preventDefault();
+        try {
+            const formData = new FormData();
+            formData.append('module', activeModule.id);
+            formData.append('title', assignmentData.title);
+            formData.append('description', assignmentData.description);
+            formData.append('due_date', assignmentData.due_date);
+            formData.append('max_score', assignmentData.max_score);
+            
+            if (assignmentData.file) {
+                formData.append('attachment', assignmentData.file);
+            }
+
+            if (editingAssignment) {
+                await learningService.updateAssignment(editingAssignment.id, formData);
+            } else {
+                await learningService.createAssignment(formData);
+            }
+
+            const updated = await learningService.getCourse(managingCourse.id);
+            setManagingCourse(updated);
+            setActiveModule(updated.modules.find(m => m.id === activeModule.id));
+            setIsAddingAssignment(false);
+            setEditingAssignment(null);
+            setAssignmentData({ title: '', description: '', due_date: '', max_score: 10 });
+            alert('Tarea guardada exitosamente');
+        } catch (error) {
+            console.error("Error saving assignment:", error);
+            alert('Error al guardar la tarea');
+        }
+    };
+
+    const handleDeleteAssignment = async (id) => {
+        if (!window.confirm('¿Eliminar esta tarea?')) return;
+        try {
+            await learningService.deleteAssignment(id);
+            const updated = await learningService.getCourse(managingCourse.id);
+            setManagingCourse(updated);
+            setActiveModule(updated.modules.find(m => m.id === activeModule.id));
+        } catch (error) {
+            console.error("Error deleting assignment:", error);
+        }
+    };
+
+    const handleSaveGroup = async () => {
+        if (!newGroup.name) return;
+        
+        let institutionId = user?.institution?.id || user?.institution || user?.institution_id || localStorage.getItem('institution_id');
+        
+        if (!institutionId && (user?.username === 'admin' || user?.role === 'ADMIN')) {
+            institutionId = 1; 
+        }
+
+        try {
+            const groupData = {
+                ...newGroup,
+                institution: institutionId
+            };
+            
+            await learningService.createGroup(groupData);
+            setIsCreatingGroup(false);
+            setNewGroup({ name: '', description: '', icon: 'Tag' });
+            fetchGroups();
+            alert("Grupo creado con éxito");
+        } catch (error) {
+            console.error("Error creating group:", error);
+            const serverMsg = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+            alert("Error al crear grupo: " + serverMsg);
+        }
+    };
+
+    const handleDeleteGroup = async (id) => {
+        if (!window.confirm("¿Seguro que deseas eliminar este grupo? Esto afectará la organización de los cursos.")) return;
+        try {
+            await learningService.deleteGroup(id);
+            fetchGroups();
+        } catch (error) {
+            console.error("Error deleting group:", error);
+            alert("Error al eliminar grupo.");
+        }
+    };
+
+    const handleSaveTag = async () => {
+        if (!newTag.name || !newTag.group) return;
+        try {
+            await learningService.createTag(newTag);
+            setIsCreatingTag(false);
+            setNewTag({ group: '', name: '', description: '' });
+            fetchGroups();
+        } catch (error) {
+            console.error("Error creating tag:", error);
+            alert("Error al crear etiqueta.");
+        }
+    };
+
+    const handleDeleteTag = async (id) => {
+        if (!window.confirm("¿Seguro que deseas eliminar esta etiqueta?")) return;
+        try {
+            await learningService.deleteTag(id);
+            fetchGroups();
+        } catch (error) {
+            console.error("Error deleting tag:", error);
+            alert(`Error al eliminar etiqueta: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
+        }
+    };
+
+    const [editingGroup, setEditingGroup] = useState(null);
+    const [editGroupData, setEditGroupData] = useState({ name: '', description: '' });
+    const [editingTag, setEditingTag] = useState(null);
+    const [editTagData, setEditTagData] = useState({ name: '', description: '' });
+
+    const handleEditGroup = (group) => {
+        setEditingGroup(group);
+        setEditGroupData({ name: group.name, description: group.description });
+    };
+
+    const handleUpdateGroup = async () => {
+        if (!editGroupData.name) return;
+        try {
+            await learningService.updateGroup(editingGroup.id, editGroupData);
+            setEditingGroup(null);
+            fetchGroups();
+        } catch (error) {
+            console.error('Error updating group:', error);
+            alert(`Error al actualizar grupo: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
+        }
+    };
+
+    const handleEditTag = (tag) => {
+        setEditingTag(tag);
+        setEditTagData({ name: tag.name, description: tag.description || '' });
+    };
+
+    const handleUpdateTag = async () => {
+        if (!editTagData.name) return;
+        try {
+            await learningService.updateTag(editingTag.id, editTagData);
+            setEditingTag(null);
+            fetchGroups();
+        } catch (error) {
+            console.error('Error updating tag:', error);
+            alert(`Error al actualizar etiqueta: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
+        }
+    };
+
+    const renderGroups = () => (
+        <div className="space-y-12 animate-fade-in">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-xl shadow-slate-200/20">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Editor de <span className="text-indigo-600">Grupos y Etiquetas</span></h2>
+                    <p className="text-slate-400 font-medium italic">Organiza los cursos por grupos temáticos y etiquetas específicas.</p>
+                </div>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => setIsCreatingGroup(true)}
+                        className="px-6 py-3 bg-indigo-600 text-white rounded-2xl text-xs font-black hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100 flex items-center gap-2"
+                    >
+                        <PlusCircle size={18} /> Nuevo Grupo
+                    </button>
+                    <button 
+                        onClick={() => setIsCreatingTag(true)}
+                        className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-xs font-black hover:bg-slate-200 transition-all flex items-center gap-2"
+                    >
+                        <PlusCircle size={18} /> Nueva Etiqueta
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {courseGroups.length > 0 ? (
+                    courseGroups.map(group => (
+                        <div key={group.id} className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden">
+                            <div className="flex items-start justify-between mb-8">
+                                <div className="w-16 h-16 bg-indigo-50 rounded-[1.5rem] flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-lg shadow-indigo-50">
+                                    <Tag size={28} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => handleEditGroup(group)}
+                                        className="p-3 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all"
+                                    >
+                                        <Edit size={20} />
+                                    </button>
+                                    <button 
+                                        onClick={() => handleDeleteGroup(group.id)}
+                                        className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-black text-slate-900 mb-2 uppercase tracking-tighter">{group.name}</h3>
+                            <p className="text-slate-400 text-sm font-bold line-clamp-2 mb-8">{group.description || 'Sin descripción detallada'}</p>
+                            
+                            <div className="space-y-3 pt-8 border-t border-slate-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Etiquetas</p>
+                                    <span className="text-[10px] font-black text-indigo-400">{tags.filter(t => t.group === group.id).length}</span>
+                                </div>
+                                {tags.filter(t => t.group === group.id).length > 0 ? (
+                                    tags.filter(t => t.group === group.id).map(tag => (
+                                        <div key={tag.id} className="flex items-center justify-between bg-slate-50 hover:bg-indigo-50 rounded-xl px-4 py-2.5 transition-all group/tag">
+                                            <span className="text-sm font-bold text-slate-600 group-hover/tag:text-indigo-700">{tag.name}</span>
+                                            <div className="flex gap-1 opacity-0 group-hover/tag:opacity-100 transition-opacity">
+                                                <button onClick={() => handleEditTag(tag)} className="p-1.5 rounded-lg hover:bg-indigo-100 text-indigo-400 transition-all">
+                                                    <Edit size={13} />
+                                                </button>
+                                                <button onClick={() => handleDeleteTag(tag.id)} className="p-1.5 rounded-lg hover:bg-red-100 text-red-400 transition-all">
+                                                    <X size={13} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-[10px] font-bold text-slate-300 italic text-center py-4">Sin etiquetas &mdash; crea una arriba</p>
+                                )}
+                            </div>
+                        </div>
+                    ))
+                ) : (
+                    <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100 animate-fade-in">
+                        <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-full flex items-center justify-center mb-6">
+                            <Tag size={48} />
+                        </div>
+                        <h3 className="text-3xl font-black text-slate-900 mb-2">Sin Grupos creados</h3>
+                        <p className="text-slate-400 font-medium mb-10 max-w-sm text-center">Organiza tus cursos por grupos temáticos para mejorar la navegación.</p>
+                        <button 
+                            onClick={() => setIsCreatingGroup(true)}
+                            className="px-10 py-5 bg-indigo-600 text-white rounded-[2rem] font-black text-sm hover:bg-slate-900 transition-all shadow-2xl shadow-indigo-100 flex items-center gap-3"
+                        >
+                            <Plus size={20} /> Crear mi primer Grupo
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {editingTag && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden border border-white/20 animate-zoom-in">
+                        <div className="bg-slate-900 p-10 text-white">
+                            <h3 className="text-4xl font-black tracking-tighter mb-1">Editar Etiqueta</h3>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">{editingTag.group_name}</p>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
+                                <input
+                                    type="text"
+                                    value={editTagData.name}
+                                    onChange={(e) => setEditTagData({...editTagData, name: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción</label>
+                                <input
+                                    type="text"
+                                    value={editTagData.description}
+                                    onChange={(e) => setEditTagData({...editTagData, description: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button onClick={handleUpdateTag} className="flex-grow py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100">
+                                    Guardar Cambios
+                                </button>
+                                <button onClick={() => setEditingTag(null)} className="px-8 py-5 bg-slate-100 text-slate-400 rounded-[1.5rem] font-black text-sm hover:bg-slate-200 transition-all">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {editingGroup && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-zoom-in">
+                        <div className="bg-indigo-600 p-10 text-white">
+                            <h3 className="text-4xl font-black tracking-tighter mb-1">Editar Grupo</h3>
+                            <p className="text-indigo-200 text-[10px] font-black uppercase tracking-widest">{editingGroup.name}</p>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Grupo</label>
+                                <input 
+                                    type="text"
+                                    value={editGroupData.name}
+                                    onChange={(e) => setEditGroupData({...editGroupData, name: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción</label>
+                                <textarea 
+                                    value={editGroupData.description}
+                                    onChange={(e) => setEditGroupData({...editGroupData, description: e.target.value})}
+                                    rows="3"
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button 
+                                    onClick={handleUpdateGroup}
+                                    className="flex-grow py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100"
+                                >
+                                    Guardar Cambios
+                                </button>
+                                <button 
+                                    onClick={() => setEditingGroup(null)}
+                                    className="px-8 py-5 bg-slate-100 text-slate-400 rounded-[1.5rem] font-black text-sm hover:bg-slate-200 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isCreatingGroup && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-zoom-in">
+                        <div className="bg-slate-900 p-10 text-white">
+                            <h3 className="text-4xl font-black tracking-tighter mb-1">Nuevo Grupo</h3>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Organización Temática de Cursos</p>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre del Grupo</label>
+                                <input 
+                                    type="text"
+                                    value={newGroup.name}
+                                    onChange={(e) => setNewGroup({...newGroup, name: e.target.value})}
+                                    placeholder="Ej: Ciencias, Humanidades, Tecnología"
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all placeholder:text-slate-300"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descripción</label>
+                                <textarea 
+                                    value={newGroup.description}
+                                    onChange={(e) => setNewGroup({...newGroup, description: e.target.value})}
+                                    rows="3"
+                                    placeholder="Describe brevemente de qué trata este grupo..."
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all placeholder:text-slate-300"
+                                />
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button 
+                                    onClick={handleSaveGroup}
+                                    className="flex-grow py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100"
+                                >
+                                    Crear Grupo
+                                </button>
+                                <button 
+                                    onClick={() => setIsCreatingGroup(false)}
+                                    className="px-8 py-5 bg-slate-100 text-slate-400 rounded-[1.5rem] font-black text-sm hover:bg-slate-200 transition-all"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isCreatingTag && (
+                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xl">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden border border-white/20 animate-zoom-in">
+                        <div className="bg-slate-900 p-10 text-white">
+                            <h3 className="text-4xl font-black tracking-tighter mb-1">Nueva Etiqueta</h3>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Especialización de Contenido</p>
+                        </div>
+                        <div className="p-10 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Vincular a Grupo</label>
+                                <select 
+                                    value={newTag.group}
+                                    onChange={(e) => setNewTag({...newTag, group: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">Seleccione un grupo...</option>
+                                    {courseGroups.map(g => (
+                                        <option key={g.id} value={g.id}>{g.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre de la Etiqueta</label>
+                                <input 
+                                    type="text"
+                                    value={newTag.name}
+                                    onChange={(e) => setNewTag({...newTag, name: e.target.value})}
+                                    placeholder="Ej: Matemáticas, Programación, Arte"
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black text-slate-700 outline-none transition-all placeholder:text-slate-300"
+                                />
+                            </div>
+                            <div className="flex gap-4 pt-4">
+                                <button 
+                                    onClick={handleSaveTag}
+                                    className="flex-grow py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black text-sm hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100"
+                                >
+                                    Guardar Etiqueta
+                                </button>
+                                <button 
+                                    onClick={() => setIsCreatingTag(false)}
+                                    className="px-8 py-5 bg-slate-100 text-slate-400 rounded-[1.5rem] font-black text-sm hover:bg-slate-200 transition-all"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 
     if (loading) return <div className="p-20 text-center">Cargando panel de instructor...</div>;
 
     return (
-        <div className="p-4 lg:p-12 space-y-8 lg:space-y-12 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-2">Panel del Instructor</h1>
-                    <p className="text-slate-400 text-sm lg:text-base font-medium">Gestiona tus cursos y módulos.</p>
-                </div>
-                <button 
-                    onClick={() => setIsCreating(true)}
-                    className="px-8 py-4 bg-indigo-600 text-white rounded-[1.5rem] font-black shadow-xl hover:bg-slate-900 transition-all flex items-center gap-3 scale-105"
-                >
-                    <Plus size={20} />
-                    Crear Nuevo Curso
-                </button>
-            </div>
+        <div className="min-h-screen bg-slate-50 relative flex flex-col">
+            {/* Main Header */}
+            <header className="bg-white border-b border-slate-100 sticky top-0 z-[100] px-6 lg:px-10 py-6">
+                <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-6">
+                        <button 
+                            onClick={() => navigate('/dashboard')}
+                            className="p-4 bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white rounded-[1.5rem] transition-all flex items-center gap-2 group shadow-sm"
+                        >
+                            <LayoutDashboard size={20} className="group-hover:scale-110 transition-transform" />
+                            <span className="text-xs font-black">Dashboard</span>
+                        </button>
+                        <div className="h-10 w-px bg-slate-100 hidden md:block"></div>
+                        <div>
+                            <h1 className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tighter flex items-center gap-4">
+                                <Settings size={32} className="text-indigo-600" />
+                                Panel <span className="text-indigo-600">Docente</span>
+                            </h1>
+                            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1 ml-12">
+                                Gestión de Cursos y Seguimiento Académico
+                            </p>
+                        </div>
+                    </div>
 
-            {/* Stats Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 lg:gap-8">
-                <div className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 mb-6">
-                        <BookOpen size={20} />
+                    <div className="flex bg-slate-50 p-2 rounded-[2rem] border border-slate-100 shadow-inner">
+                        <button 
+                            onClick={() => setActiveTab('dashboard')}
+                            className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'dashboard' ? 'bg-white shadow-xl text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <BarChart3 size={16} /> Dashboard
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('courses')}
+                            className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'courses' ? 'bg-white shadow-xl text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <BookOpen size={16} /> Mis Cursos
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('groups')}
+                            className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'groups' ? 'bg-white shadow-xl text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <Tag size={16} /> Grupos
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('all_submissions')}
+                            className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'all_submissions' ? 'bg-white shadow-xl text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            <FileText size={16} /> Todas las Tareas
+                        </button>
+                        {isAdmin && (
+                            <button 
+                                onClick={() => setActiveTab('groups')}
+                                className={`px-8 py-3 rounded-[1.5rem] text-xs font-black transition-all flex items-center gap-2 ${activeTab === 'groups' ? 'bg-white shadow-xl text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                <Tag size={16} /> Grupos
+                            </button>
+                        )}
                     </div>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Cursos</p>
-                    <h3 className="text-2xl lg:text-3xl font-black text-slate-900">{courses.length}</h3>
-                </div>
-                <div className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 mb-6">
-                        <Users size={20} />
-                    </div>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Alumnos</p>
-                    <h3 className="text-2xl lg:text-3xl font-black text-slate-900">
-                        {courses.reduce((acc, c) => acc + (c.enrollment_count || 0), 0)}
-                    </h3>
-                </div>
-                <div className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[3rem] border border-slate-100 shadow-sm">
-                    <div className="w-10 h-10 lg:w-12 lg:h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-6">
-                        <DollarSign size={20} />
-                    </div>
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Ingresos</p>
-                    <h3 className="text-2xl lg:text-3xl font-black text-slate-900">$0.00</h3>
-                </div>
-            </div>
 
-            {/* Courses List */}
+                    <div className="hidden lg:flex items-center gap-4">
+                        <div className="text-right">
+                            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">Año Lectivo</p>
+                            <p className="font-black text-indigo-600 text-sm">{stats.active_year_name}</p>
+                        </div>
+                        <button 
+                            onClick={() => setIsCreating(true)}
+                            className="bg-indigo-600 text-white px-8 py-4 rounded-[1.5rem] font-black text-xs hover:bg-slate-900 transition-all shadow-xl shadow-indigo-100 flex items-center gap-3"
+                        >
+                            <Plus size={20} /> Crear Curso
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="flex-grow p-6 lg:p-10 max-w-[1600px] mx-auto w-full">
+
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-10 animate-fade-in">
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                            {[
+                                { label: 'Mis Cursos', value: stats.total_courses, icon: BookOpen, color: 'bg-indigo-50 text-indigo-600', sub: 'Programas Activos' },
+                                { label: 'Alumnos Activos', value: stats.active_students, icon: Users, color: 'bg-emerald-50 text-emerald-600', sub: `De ${stats.total_students} matriculados` },
+                                { label: 'Tareas Pendientes', value: stats.pending_assignments, icon: Clock, color: 'bg-amber-50 text-amber-600', sub: 'Por calificar' },
+                                { label: 'Progreso Promedio', value: '78%', icon: Trophy, color: 'bg-purple-50 text-purple-600', sub: 'Nivel del Centro' },
+                            ].map((card, i) => (
+                                <div key={i} className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/20 hover:scale-105 transition-all group">
+                                    <div className={`w-14 h-14 ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:rotate-12 transition-transform`}>
+                                        <card.icon size={24} />
+                                    </div>
+                                    <h3 className="text-5xl font-black text-slate-900 tracking-tighter mb-2">{card.value}</h3>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>
+                                    <p className="text-xs font-bold text-slate-300 mt-1">{card.sub}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Visual Analytics / Promotion */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                            <div className="lg:col-span-2 bg-white rounded-[3rem] p-12 border border-slate-100 shadow-2xl shadow-slate-200/10">
+                                <div className="flex items-center justify-between mb-10">
+                                    <h3 className="text-3xl font-black text-slate-900 tracking-tight">Estatus de Participación</h3>
+                                    <div className="flex gap-2">
+                                        <button className="px-5 py-2 bg-slate-50 text-[10px] font-black text-slate-400 border border-slate-100 rounded-xl hover:bg-slate-100">Hoy</button>
+                                        <button className="px-5 py-2 bg-indigo-50 text-[10px] font-black text-indigo-600 border border-indigo-100 rounded-xl">Año Lectivo</button>
+                                    </div>
+                                </div>
+                                <div className="h-64 flex items-center justify-center border-2 border-dashed border-slate-100 rounded-[2rem]">
+                                    <p className="text-slate-300 font-bold uppercase tracking-widest text-xs">Visión General del Rendimiento Alumnos Registrados</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-indigo-600 rounded-[3rem] p-12 text-white shadow-2xl shadow-indigo-200 flex flex-col justify-between">
+                                <div>
+                                    <Sparkles className="text-indigo-200 mb-6" size={40} />
+                                    <h3 className="text-4xl font-black tracking-tighter leading-none mb-4">Eduka AI <br/>Analytics</h3>
+                                    <p className="text-indigo-100/70 font-medium leading-relaxed">Próximamente: Obtén reportes detallados y predicciones de deserción basados en el comportamiento de tus alumnos.</p>
+                                </div>
+                                <button className="mt-8 w-full py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl font-black text-xs transition-all">Configurar Notificaciones AI</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'courses' && (
+                    <div className="space-y-8 animate-fade-in">
+
+            {/* Group Dropdown Filter + Table */}
             <div className="bg-white rounded-[4rem] border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-10 border-b border-slate-50 flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">Mis Cursos</h2>
+                <div className="p-10 border-b border-slate-50 flex flex-wrap items-center gap-4 justify-between">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">Mis Cursos</h2>
+                        <select
+                            value={courseGroupFilter}
+                            onChange={(e) => setCourseGroupFilter(e.target.value)}
+                            className="bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl px-5 py-2.5 font-bold text-slate-600 outline-none transition-all text-xs appearance-none cursor-pointer"
+                        >
+                            <option value="all">Todos los Grupos</option>
+                            {courseGroups.map(g => (
+                                <option key={g.id} value={String(g.id)}>{g.name}</option>
+                            ))}
+                        </select>
+                        {courseGroupFilter !== 'all' && (
+                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                {courses.filter(c => tags.filter(t => t.group === Number(courseGroupFilter)).some(t => t.id === c.tag_id || t.id === c.tag)).length} cursos
+                            </span>
+                        )}
+                    </div>
                     <div className="flex bg-slate-50 p-1.5 rounded-2xl">
                         <button className="px-6 py-2 bg-white rounded-xl shadow-sm text-sm font-black text-indigo-600">Activos</button>
                         <button className="px-6 py-2 text-sm font-bold text-slate-400">Borradores</button>
@@ -215,7 +907,13 @@ const InstructorDashboard = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {courses.map(course => (
+                            {courses
+                              .filter(course => {
+                                if (courseGroupFilter === 'all') return true;
+                                const groupTags = tags.filter(t => t.group === Number(courseGroupFilter));
+                                return groupTags.some(t => t.id === course.tag_id || t.id === course.tag);
+                              })
+                              .map(course => (
                                 <tr key={course.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 lg:px-10 py-6 lg:py-8">
                                         <div className="flex items-center gap-3 lg:gap-4">
@@ -279,6 +977,118 @@ const InstructorDashboard = () => {
                     </table>
                 </div>
             </div>
+        </div>
+    )}
+
+                {activeTab === 'all_submissions' && (
+                    <div className="space-y-8 animate-fade-in">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">Centro de <span className="text-indigo-600">Tareas</span></h2>
+                                <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Gestión Centralizada de Entregas</p>
+                            </div>
+                            <div className="flex gap-4">
+                                <button 
+                                    onClick={() => handleExport('csv')}
+                                    disabled={isExporting}
+                                    className="px-6 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                                >
+                                    <FileDown size={18} /> Exportar CSV
+                                </button>
+                                <button 
+                                    onClick={() => handleExport('excel')}
+                                    disabled={isExporting}
+                                    className="px-6 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                                >
+                                    <FileDown size={18} /> Exportar Excel
+                                </button>
+                                <button 
+                                    onClick={() => handleExport('pdf')}
+                                    disabled={isExporting}
+                                    className="px-6 py-3 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
+                                >
+                                    <FileText size={18} /> Reporte PDF
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-[3rem] border border-slate-100 shadow-xl overflow-hidden p-10">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex gap-4">
+                                    <select
+                                        className="bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl px-6 py-3 font-bold text-slate-700 outline-none transition-all text-xs appearance-none cursor-pointer"
+                                        onChange={(e) => fetchUnifiedSubmissions(e.target.value || null)}
+                                    >
+                                        <option value="">Todos los Grupos</option>
+                                        {courseGroups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                    <select className="bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl px-6 py-3 font-bold text-slate-700 outline-none transition-all text-xs appearance-none cursor-pointer">
+                                        <option>Solo Pendientes</option>
+                                        <option>Calificados</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-50">
+                                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumno</th>
+                                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarea / Curso</th>
+                                            <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha Envío</th>
+                                            <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {unifiedSubmissions.length > 0 ? (
+                                            unifiedSubmissions.map((sub) => (
+                                                <tr key={sub.id} className="group hover:bg-slate-50/50 transition-all">
+                                                    <td className="px-6 py-4 font-black text-slate-700 text-xs">
+                                                        {sub.student_name}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <p className="font-bold text-slate-900 text-xs">{sub.assignment_title}</p>
+                                                        <p className="text-[10px] text-indigo-500 font-black">{sub.course_title}</p>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-slate-400 font-bold">
+                                                        {new Date(sub.submitted_at).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setSelectedAssignmentSub(sub);
+                                                                setIsViewingSubmissions(true);
+                                                                setSubmissions([sub]); // Show this specific one in modal
+                                                                setGradingData({ score: sub.score || '', teacher_feedback: sub.teacher_feedback || '' });
+                                                            }}
+                                                            className={`px-4 py-2 rounded-xl text-[10px] font-black transition-all ${sub.score === null ? 'bg-amber-500 text-white hover:bg-slate-900 shadow-lg shadow-amber-100' : 'bg-slate-100 text-slate-400'}`}
+                                                        >
+                                                            {sub.score === null ? 'Calificar' : `Nota: ${sub.score}`}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr className="group hover:bg-slate-50/50 transition-all">
+                                                <td className="px-6 py-6" colSpan="4">
+                                                    <div className="flex flex-col items-center py-20 opacity-20">
+                                                        <Clock size={48} className="mb-4" />
+                                                        <p className="font-black">No hay tareas pendientes por procesar</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'groups' && renderGroups()}
+            </main>
 
             {/* Course Content Manager Modal */}
             {managingCourse && (
@@ -349,6 +1159,18 @@ const InstructorDashboard = () => {
                                             >
                                                 Quiz
                                             </button>
+                                            <button 
+                                                onClick={() => setActiveTab('assignments')}
+                                                className={`px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'assignments' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >
+                                                Tareas
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveTab('students')}
+                                                className={`px-6 py-2 rounded-lg text-xs font-black transition-all ${activeTab === 'students' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >
+                                                Estudiantes
+                                            </button>
                                         </div>
                                     </div>
 
@@ -413,7 +1235,7 @@ const InstructorDashboard = () => {
                                                     ))}
                                                 </div>
                                             </div>
-                                        ) : (
+                                        ) : activeTab === 'quiz' ? (
                                             /* Quiz Section */
                                             <div className="space-y-8 animate-fade-in pb-20">
                                                 <div className="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-xl shadow-slate-200/20 space-y-8">
@@ -547,6 +1369,157 @@ const InstructorDashboard = () => {
                                                     <Save size={24} /> Guardar Cambios en la Evaluación
                                                 </button>
                                             </div>
+                                        ) : activeTab === 'students' ? (
+                                            /* Students Management Section */
+                                            <div className="space-y-6 animate-fade-in pb-20">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h4 className="text-xl font-black text-slate-900 tracking-tight">Gestión de Alumnos</h4>
+                                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Total: {courseEnrollments.length} inscritos</p>
+                                                    </div>
+                                                    <button 
+                                                        onClick={handleSyncStudents}
+                                                        disabled={isSyncingStudents}
+                                                        className="px-6 py-3 bg-emerald-500 text-white rounded-2xl font-black text-xs flex items-center gap-3 hover:bg-emerald-600 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                                                    >
+                                                        <Users size={18} /> {isSyncingStudents ? 'Sincronizando...' : 'Sincronizar Alumnos Académicos'}
+                                                    </button>
+                                                </div>
+
+                                                <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
+                                                    <table className="w-full border-collapse">
+                                                        <thead>
+                                                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                                                                <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Alumno</th>
+                                                                <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Progreso</th>
+                                                                <th className="px-8 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Última Actividad</th>
+                                                                <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Estado</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-50">
+                                                            {courseEnrollments.map((enr) => (
+                                                                <tr key={enr.id} className="hover:bg-slate-50/30 transition-colors">
+                                                                    <td className="px-8 py-6">
+                                                                        <div className="flex items-center gap-4">
+                                                                            <div className="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center font-black text-indigo-600">
+                                                                                {enr.student_name?.[0] || 'U'}
+                                                                            </div>
+                                                                            <div>
+                                                                                <div className="font-black text-slate-900">{enr.student_name}</div>
+                                                                                <div className="text-[10px] text-slate-400 font-bold">{enr.student_email}</div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-8 py-6 w-1/4">
+                                                                        <div className="space-y-2">
+                                                                            <div className="flex items-center justify-between text-[10px] font-black mr-2">
+                                                                                <span className="text-indigo-600">{enr.progress_percentage}%</span>
+                                                                            </div>
+                                                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden mr-2">
+                                                                                <div 
+                                                                                    className="h-full bg-indigo-500 rounded-full transition-all duration-1000"
+                                                                                    style={{ width: `${enr.progress_percentage}%` }}
+                                                                                ></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-8 py-6 text-center">
+                                                                        <div className="text-xs font-bold text-slate-600">
+                                                                            {enr.last_activity ? new Date(enr.last_activity).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'No ha iniciado'}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td className="px-8 py-6 text-right">
+                                                                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${
+                                                                            enr.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 
+                                                                            enr.status === 'completed' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400'
+                                                                        }`}>
+                                                                            {enr.status}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                            {courseEnrollments.length === 0 && (
+                                                                <tr>
+                                                                    <td colSpan="4" className="px-8 py-20 text-center">
+                                                                        <div className="flex flex-col items-center opacity-20">
+                                                                            <Users size={64} className="mb-4" />
+                                                                            <p className="text-xl font-bold">No hay alumnos inscritos en este curso</p>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Assignments Section */
+                                            <div className="space-y-6 animate-fade-in pb-20">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Tareas del Módulo</h4>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setAssignmentData({ title: '', description: '', due_date: '', max_score: 10 });
+                                                            setIsAddingAssignment(true);
+                                                        }}
+                                                        className="px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-[10px] flex items-center gap-2 hover:bg-slate-900 transition-all shadow-xl"
+                                                    >
+                                                        <Plus size={14} /> Nueva Tarea
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 gap-6">
+                                                    {activeModule.assignments?.length > 0 ? (
+                                                        activeModule.assignments.map((assignment, idx) => (
+                                                            <div key={assignment.id} className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm flex items-center justify-between group">
+                                                                <div className="flex items-center gap-6">
+                                                                    <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
+                                                                        <Calendar size={24} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <h5 className="text-xl font-black text-slate-900">{assignment.title}</h5>
+                                                                        <div className="flex items-center gap-4 mt-1">
+                                                                            <span className="text-[10px] font-black text-slate-400 uppercase">Vence: {new Date(assignment.due_date).toLocaleDateString()}</span>
+                                                                            <span className="text-[10px] font-black text-indigo-500 uppercase">Pts: {assignment.max_score}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <button 
+                                                                        onClick={() => fetchSubmissions(assignment)}
+                                                                        className="p-3 bg-indigo-50 text-indigo-400 hover:text-indigo-700 rounded-xl transition-all flex items-center gap-2"
+                                                                        title="Ver Entregas"
+                                                                    >
+                                                                        <Users size={18} />
+                                                                        {assignment.submissions_count > 0 && <span className="text-[10px] font-black">{assignment.submissions_count}</span>}
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            setEditingAssignment(assignment);
+                                                                            setAssignmentData(assignment);
+                                                                            setIsAddingAssignment(true);
+                                                                        }}
+                                                                        className="p-3 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl transition-all"
+                                                                    >
+                                                                        <Edit size={18} />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteAssignment(assignment.id)}
+                                                                        className="p-3 bg-slate-50 text-slate-400 hover:text-red-500 rounded-xl transition-all"
+                                                                    >
+                                                                        <Trash2 size={18} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="py-20 text-center bg-white rounded-[3rem] border border-dashed border-slate-200">
+                                                            <FileText size={48} className="mx-auto text-slate-200 mb-4" />
+                                                            <p className="text-slate-400 font-bold">No hay tareas creadas aún.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </>
@@ -593,6 +1566,35 @@ const InstructorDashboard = () => {
                                     className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-bold text-slate-700 outline-none transition-all"
                                     placeholder="Ej: De cero a experto en 30 días"
                                 />
+                            </div>
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Grupo</label>
+                                    <select 
+                                        value={selectedGroup}
+                                        onChange={(e) => setSelectedGroup(e.target.value)}
+                                        className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-bold text-slate-700 outline-none transition-all appearance-none"
+                                    >
+                                        <option value="">Seleccionar Grupo</option>
+                                        {courseGroups.map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Etiqueta</label>
+                                    <select 
+                                        value={newCourse.tag_id || ''}
+                                        onChange={(e) => setNewCourse({...newCourse, tag_id: e.target.value})}
+                                        className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-bold text-slate-700 outline-none transition-all appearance-none"
+                                        disabled={!selectedGroup}
+                                    >
+                                        <option value="">Seleccionar Etiqueta</option>
+                                        {tags.map(tag => (
+                                            <option key={tag.id} value={tag.id}>{tag.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
@@ -675,11 +1677,35 @@ const InstructorDashboard = () => {
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contenido / Notas</label>
                                 <textarea 
                                     id="lesson-content"
-                                    rows="4"
+                                    rows="3"
                                     defaultValue={editingLesson?.content}
                                     className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl p-3 font-bold text-slate-700 outline-none transition-all"
                                     placeholder="Describe brevemente los objetivos de esta lección..."
                                 ></textarea>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1 font-black">Enlace Clase en Vivo (Zoom/Meet)</label>
+                                    <div className="relative">
+                                        <Link size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" />
+                                        <input 
+                                            id="lesson-meeting-url"
+                                            type="url" 
+                                            defaultValue={editingLesson?.meeting_url}
+                                            className="w-full bg-indigo-50/30 border-2 border-transparent focus:border-indigo-500 rounded-xl py-3 pl-11 pr-4 font-bold text-slate-700 outline-none transition-all"
+                                            placeholder="https://zoom.us/j/..."
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1 font-black">Fecha y Hora Programada</label>
+                                    <input 
+                                        id="lesson-meeting-date"
+                                        type="datetime-local" 
+                                        defaultValue={editingLesson?.meeting_date ? new Date(editingLesson.meeting_date).toISOString().slice(0, 16) : ''}
+                                        className="w-full bg-indigo-50/30 border-2 border-transparent focus:border-indigo-500 rounded-xl p-3 font-bold text-slate-700 outline-none transition-all"
+                                    />
+                                </div>
                             </div>
                         </div>
                         <div className="p-8 border-t border-slate-50 bg-slate-50 flex gap-3">
@@ -688,12 +1714,211 @@ const InstructorDashboard = () => {
                                     const title = document.getElementById('lesson-title').value;
                                     const video_url = document.getElementById('lesson-video').value;
                                     const content = document.getElementById('lesson-content').value;
-                                    handleSaveLesson({ title, video_url, content });
+                                    const meeting_url = document.getElementById('lesson-meeting-url').value;
+                                    const meeting_date = document.getElementById('lesson-meeting-date').value;
+                                    handleSaveLesson({ title, video_url, content, meeting_url, meeting_date });
                                 }}
                                 className="flex-grow py-3 bg-slate-900 text-white rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-lg"
                             >
                                 <Save size={18} className="inline-block mr-2" /> Guardar Lección
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assignment Editor Modal */}
+            {isAddingAssignment && (
+                <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xl flex items-center justify-center z-[300] p-6 overflow-y-auto">
+                    <form onSubmit={handleSaveAssignment} className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-zoom-in my-auto">
+                        <div className="p-8 border-b border-slate-50 bg-slate-50 flex items-center justify-between">
+                            <h3 className="text-xl font-black tracking-tight">{editingAssignment ? 'Editar Tarea' : 'Nueva Tarea'}</h3>
+                            <button type="button" onClick={() => { setIsAddingAssignment(false); setEditingAssignment(null); }} className="p-2 hover:bg-white rounded-full transition-all"><X size={20}/></button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Título de la Tarea</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={assignmentData.title}
+                                    onChange={(e) => setAssignmentData({...assignmentData, title: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl p-4 font-bold text-slate-700 outline-none transition-all"
+                                    placeholder="Ej: Ensayo sobre la Revolución Industrial"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fecha de Entrega</label>
+                                <input 
+                                    type="datetime-local" 
+                                    required
+                                    value={assignmentData.due_date ? new Date(assignmentData.due_date).toISOString().slice(0, 16) : ''}
+                                    onChange={(e) => setAssignmentData({...assignmentData, due_date: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl p-4 font-bold text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Puntaje Máximo</label>
+                                <input 
+                                    type="number" 
+                                    required
+                                    value={assignmentData.max_score}
+                                    onChange={(e) => setAssignmentData({...assignmentData, max_score: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl p-4 font-bold text-slate-700 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Instrucciones</label>
+                                <textarea 
+                                    rows="4"
+                                    value={assignmentData.description}
+                                    onChange={(e) => setAssignmentData({...assignmentData, description: e.target.value})}
+                                    className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-xl p-4 font-bold text-slate-700 outline-none transition-all"
+                                    placeholder="Instrucciones detalladas para los alumnos..."
+                                ></textarea>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 text-indigo-600 font-black">Sincronización Académica (Opcional)</label>
+                                <select 
+                                    value={assignmentData.academic_category || ''}
+                                    onChange={(e) => setAssignmentData({...assignmentData, academic_category: e.target.value})}
+                                    className="w-full bg-indigo-50/50 border-2 border-dashed border-indigo-100 focus:border-indigo-500 rounded-xl p-4 font-bold text-slate-700 outline-none transition-all appearance-none"
+                                >
+                                    <option value="">Solo LMS (No se pasa al registro oficial)</option>
+                                    {evaluationCategories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>
+                                            {cat.name} ({cat.weight}%) {cat.trimester ? `- Trimestre ${cat.trimester}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-[9px] text-slate-400 mt-1 px-1">
+                                    Vincular con un aporte académico oficial para pasar las notas automáticamente.
+                                </p>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Material de Apoyo (Opcional)</label>
+                                <input 
+                                    type="file" 
+                                    onChange={(e) => setAssignmentData({...assignmentData, file: e.target.files[0]})}
+                                    className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                                />
+                            </div>
+                        </div>
+                        <div className="p-8 border-t border-slate-50 bg-slate-50">
+                            <button 
+                                type="submit"
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black hover:bg-indigo-600 transition-all shadow-lg flex items-center justify-center gap-2"
+                            >
+                                <Save size={18} /> Guardar Tarea
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            {/* Submissions Grading Modal */}
+            {isViewingSubmissions && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-12">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl" onClick={() => setIsViewingSubmissions(false)}></div>
+                    <div className="relative bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[3.5rem] shadow-2xl flex flex-col overflow-hidden animate-spring-up">
+                        <div className="p-8 lg:p-12 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Entregas de Estudiantes</h2>
+                                <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">{selectedAssignmentSub?.title}</p>
+                            </div>
+                            <button onClick={() => setIsViewingSubmissions(false)} className="w-14 h-14 bg-white border border-slate-100 rounded-3xl flex items-center justify-center text-slate-400 hover:text-slate-900 hover:shadow-xl transition-all">
+                                <X size={24} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-grow overflow-y-auto p-8 lg:p-12">
+                            {submissions.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center opacity-30">
+                                    <Users size={80} className="mb-6" />
+                                    <p className="text-xl font-bold">Aún no hay entregas para calificar</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div className="grid grid-cols-12 gap-6 pb-4 border-b border-slate-50 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                        <div className="col-span-3">Estudiante</div>
+                                        <div className="col-span-3">Archivo</div>
+                                        <div className="col-span-2 text-center">Enviado</div>
+                                        <div className="col-span-2 text-center">Calificación</div>
+                                        <div className="col-span-2 text-right">Acciones</div>
+                                    </div>
+                                    
+                                    {submissions.map((sub) => (
+                                        <div key={sub.id} className="grid grid-cols-12 gap-6 items-center p-6 bg-slate-50/50 rounded-3xl border border-slate-50 hover:bg-white hover:shadow-xl hover:border-indigo-100 transition-all group">
+                                            <div className="col-span-3 font-black text-slate-700">{sub.student_name}</div>
+                                            <div className="col-span-3">
+                                                <a href={sub.file} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 font-black text-sm hover:underline decoration-2">
+                                                    <Download size={16} /> Ver Trabajo
+                                                </a>
+                                            </div>
+                                            <div className="col-span-2 text-center text-[10px] font-black text-slate-400">
+                                                {new Date(sub.submitted_at).toLocaleDateString()}
+                                            </div>
+                                            <div className="col-span-2 flex justify-center">
+                                                {sub.score !== null ? (
+                                                    <span className="px-4 py-1.5 bg-emerald-500 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-500/20">
+                                                        {sub.score} / {selectedAssignmentSub.max_score}
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-4 py-1.5 bg-slate-200 text-slate-500 rounded-xl text-xs font-black uppercase tracking-widest">Pendiente</span>
+                                                )}
+                                            </div>
+                                            <div className="col-span-2 flex justify-end">
+                                                <button 
+                                                    onClick={() => {
+                                                        setGradingData({ score: sub.score || '', teacher_feedback: sub.teacher_feedback || '' });
+                                                        // Inlined quick form or toggle
+                                                        const el = document.getElementById(`grading-form-${sub.id}`);
+                                                        el.classList.toggle('hidden');
+                                                    }}
+                                                    className="px-6 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] hover:bg-indigo-600 transition-all shadow-md"
+                                                >
+                                                    {sub.score !== null ? 'Editar' : 'Calificar'}
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Grading Quick Form */}
+                                            <div id={`grading-form-${sub.id}`} className="col-span-12 mt-6 p-8 bg-white rounded-[2rem] border border-indigo-100 shadow-inner hidden animate-fade-in">
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                                                    <div className="space-y-3">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nota / {selectedAssignmentSub.max_score}</label>
+                                                        <input 
+                                                            type="number"
+                                                            value={gradingData.score}
+                                                            onChange={(e) => setGradingData({...gradingData, score: e.target.value})}
+                                                            className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black outline-none transition-all"
+                                                            max={selectedAssignmentSub.max_score}
+                                                        />
+                                                    </div>
+                                                    <div className="md:col-span-2 space-y-3">
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Feedback / Observaciones</label>
+                                                        <input 
+                                                            type="text"
+                                                            value={gradingData.teacher_feedback}
+                                                            onChange={(e) => setGradingData({...gradingData, teacher_feedback: e.target.value})}
+                                                            className="w-full bg-slate-50 border-2 border-transparent focus:border-indigo-500 rounded-2xl p-4 font-black outline-none transition-all"
+                                                            placeholder="Buen trabajo..."
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-end">
+                                                        <button 
+                                                            onClick={() => handleUpdateGrade(sub.id)}
+                                                            disabled={isSubmittingGrade}
+                                                            className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-500/20 hover:bg-slate-900 transition-all disabled:opacity-50"
+                                                        >
+                                                            {isSubmittingGrade ? 'Guardando...' : 'Guardar Calificación'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

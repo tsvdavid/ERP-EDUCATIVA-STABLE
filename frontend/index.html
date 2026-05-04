@@ -20,7 +20,15 @@
   <title>Eduka360 Pro | REFRESHED</title>
   
   <script>
-    console.log("[PWA] Reactivando instalador (v5)...");
+    console.log("[PWA] Reactivando instalador (v6 - Limpieza Total)...");
+    
+    // Limpieza de emergencia del lado del cliente
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        for (let name of names) caches.delete(name);
+      });
+    }
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js?v=5')

@@ -19,13 +19,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('[PWA] Activando v5 y realizando limpieza TOTAL de caches...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
+          console.log('[PWA] Borrando cache antiguo:', cacheName);
+          return caches.delete(cacheName);
         })
       );
     })

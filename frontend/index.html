@@ -2,13 +2,36 @@
 <html lang="en">
 
 <head>
+  <script>
+    window.addEventListener('error', function(e) {
+      var div = document.createElement('div');
+      div.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:#000;color:#f87171;padding:40px;z-index:99999;font-family:monospace;overflow:auto;";
+      div.innerHTML = "<h1>FRONTEND FATAL ERROR</h1><p>The application failed to initialize.</p><hr/><pre>" + e.message + "\n" + e.filename + ":" + e.lineno + ":" + e.colno + "\n\nStack: " + (e.error ? e.error.stack : 'N/A') + "</pre>";
+      document.body.appendChild(div);
+    });
+    console.log("EARLY ERROR HANDLER READY");
+  </script>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Eduka360</title>
+  <meta name="theme-color" content="#d32f2f" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <title>Eduka360 Pro | REFRESHED</title>
+  
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+          .then(reg => console.log('[PWA] Service Worker registrado con éxito:', reg.scope))
+          .catch(err => console.error('[PWA] Fallo al registrar el Service Worker:', err));
+      });
+    }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 
 <body>

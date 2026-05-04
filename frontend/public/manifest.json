@@ -1,0 +1,26 @@
+{
+  "short_name": "Eduka360",
+  "name": "Eduka360 Sistema Educativo",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#d32f2f",
+  "description": "Plataforma integral de gestión educativa y administrativa.",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"]
+}

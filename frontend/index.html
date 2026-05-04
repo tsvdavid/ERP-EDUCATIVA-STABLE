@@ -20,28 +20,38 @@
   <title>Eduka360 Pro | REFRESHED</title>
   
   <script>
-    console.log("[PWA] Reactivando instalador (v6 - Limpieza Total)...");
-    
-    // Limpieza de emergencia del lado del cliente
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        for (let name of names) caches.delete(name);
-      });
-    }
+    // PURGA GLOBAL DEFINITIVA - v8
+    // Este script se ejecuta antes que nada para limpiar caches corruptos en móviles.
+    (function() {
+      console.log("[PWA] Iniciando Purga Global de Seguridad...");
+      
+      // 1. Desregistrar todos los Service Workers inmediatamente
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          for (let registration of registrations) {
+            registration.unregister().then(() => {
+              console.log("[PWA] Service Worker eliminado.");
+              window.location.reload(); // Recargar para asegurar carga desde red
+            });
+          }
+        });
+      }
 
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js?v=5')
-          .then(reg => {
-            console.log('[PWA] Instalador listo (v5). Scope:', reg.scope);
-          })
-          .catch(err => {
-            console.error('[PWA] Error al activar instalador:', err);
+      // 2. Borrar todas las bases de datos de Cache
+      if ('caches' in window) {
+        caches.keys().then(names => {
+          Promise.all(names.map(name => caches.delete(name))).then(() => {
+            console.log("[PWA] Caches de navegador limpiados.");
           });
-      });
-    } else {
-      console.warn("[PWA] PWA no soportada en este navegador.");
-    }
+        });
+      }
+    })();
+  </script>
+
+  <script>
+    // Solo registramos el instalador si NO hay errores previos y tras la limpieza.
+    // Pero por ahora lo dejamos desactivado para asegurar que la web cargue bien para todos.
+    console.log("[PWA] Modo de recuperación activo. Instalador pausado.");
   </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">

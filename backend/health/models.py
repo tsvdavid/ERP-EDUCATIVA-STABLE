@@ -1,11 +1,12 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from users.models import User, Institution
+from core.models import TenantModel
 
 
 # ===== FICHAS PERMANENTES (NO se resetean por año) =====
 
-class MedicalRecord(models.Model):
+class MedicalRecord(TenantModel):
     student = models.OneToOneField(User, on_delete=models.CASCADE, related_name='medical_record')
     blood_type = models.CharField(max_length=10, blank=True, null=True)
     allergies = models.TextField(blank=True, null=True)
@@ -23,7 +24,7 @@ class MedicalRecord(models.Model):
         return f"Ficha Médica: {self.student.get_full_name()}"
 
 
-class DeceRecord(models.Model):
+class DeceRecord(TenantModel):
     student = models.OneToOneField(User, on_delete=models.CASCADE, related_name='dece_record')
     family_context = models.TextField(blank=True, null=True)
     academic_history = models.TextField(blank=True, null=True)
@@ -40,7 +41,7 @@ class DeceRecord(models.Model):
 
 # ===== CONSULTAS / VISITAS (vinculadas a año lectivo) =====
 
-class MedicalVisit(models.Model):
+class MedicalVisit(TenantModel):
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='medical_visits')
     doctor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='doctor_visits')
     academic_year = models.ForeignKey('academic.AcademicYear', on_delete=models.CASCADE, related_name='medical_visits', null=True, blank=True)
@@ -60,7 +61,7 @@ class MedicalVisit(models.Model):
         return f"Consulta: {self.student.get_full_name()} ({self.date.strftime('%Y-%m-%d')})"
 
 
-class DeceVisit(models.Model):
+class DeceVisit(TenantModel):
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dece_visits')
     counselor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dece_interventions')
     academic_year = models.ForeignKey('academic.AcademicYear', on_delete=models.CASCADE, related_name='dece_visits', null=True, blank=True)
@@ -80,7 +81,7 @@ class DeceVisit(models.Model):
 
 # ===== SEGUIMIENTO CONDUCTUAL (vinculado a año lectivo) =====
 
-class BehaviorRecord(models.Model):
+class BehaviorRecord(TenantModel):
     class RecordType(models.TextChoices):
         POSITIVE = 'POSITIVE', _('Positiva')
         NEGATIVE_MILD = 'NEGATIVE_MILD', _('Negativa Leve')
@@ -120,7 +121,7 @@ class BehaviorRecord(models.Model):
         return f"{self.get_record_type_display()} - {self.student.get_full_name()} ({self.date})"
 
 
-class BehaviorCase(models.Model):
+class BehaviorCase(TenantModel):
     class AreaDestino(models.TextChoices):
         DECE = 'DECE', _('DECE')
         MEDICAL = 'MEDICAL', _('Dispensario Médico')
@@ -162,7 +163,7 @@ class BehaviorCase(models.Model):
         return f"[{self.get_area_display()}] {self.title} - {self.student.get_full_name()}"
 
 
-class CaseFollowUp(models.Model):
+class CaseFollowUp(TenantModel):
     class FollowUpType(models.TextChoices):
         INTERVIEW_STUDENT = 'INTERVIEW_STUDENT', _('Entrevista con Estudiante')
         INTERVIEW_PARENT = 'INTERVIEW_PARENT', _('Entrevista con Representante')
@@ -189,7 +190,7 @@ class CaseFollowUp(models.Model):
         return f"{self.get_follow_up_type_display()} - Caso #{self.case_id}"
 
 
-class StudentRiskProfile(models.Model):
+class StudentRiskProfile(TenantModel):
     class RiskLevel(models.TextChoices):
         GREEN = 'GREEN', _('Bien')
         YELLOW = 'YELLOW', _('Riesgo')
@@ -214,8 +215,7 @@ class StudentRiskProfile(models.Model):
         return f"{self.get_overall_risk_display()} {self.student.get_full_name()}"
 
 
-class AlertRule(models.Model):
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='alert_rules')
+class AlertRule(TenantModel):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, default='')
     negative_count_threshold = models.IntegerField(default=3)

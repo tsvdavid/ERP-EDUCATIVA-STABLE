@@ -1,9 +1,10 @@
 from django.db import models
 from users.models import Institution, User
 from accounting.models import Account
+from core.models import TenantModel
 from decimal import Decimal
 
-class Supplier(models.Model):
+class Supplier(TenantModel):
     """
     Proveedor (Vendor/Supplier).
     """
@@ -13,7 +14,7 @@ class Supplier(models.Model):
         ('PASAPORTE', 'Pasaporte'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='suppliers')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     tax_id = models.CharField(max_length=20, verbose_name="Identificación (RUC/CI)")
     tax_id_type = models.CharField(max_length=20, choices=TAX_ID_TYPE_CHOICES, default='RUC')
     
@@ -38,7 +39,7 @@ class Supplier(models.Model):
     def __str__(self):
         return f"{self.tax_id} - {self.legal_name}"
 
-class PurchaseInvoice(models.Model):
+class PurchaseInvoice(TenantModel):
     """
     Factura de Compra recibida de un proveedor.
     """
@@ -55,7 +56,7 @@ class PurchaseInvoice(models.Model):
         # Add more simplified choices as needed
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='purchase_invoices')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='invoices')
     
     # Document Info
@@ -93,7 +94,8 @@ class PurchaseInvoice(models.Model):
         self.total = self.subtotal_0 + self.subtotal_15 + self.subtotal_no_obj + self.iva
         super().save(*args, **kwargs)
 
-class PurchaseItem(models.Model):
+class PurchaseItem(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name='items')
     description = models.CharField(max_length=255)
     
@@ -110,11 +112,11 @@ class PurchaseItem(models.Model):
         self.subtotal = self.quantity * self.unit_price
         super().save(*args, **kwargs)
 
-class Withholding(models.Model):
+class Withholding(TenantModel):
     """
     Comprobante de Retención emitido al proveedor.
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     purchase_invoice = models.OneToOneField(PurchaseInvoice, on_delete=models.CASCADE, related_name='withholding')
     
     document_number = models.CharField(max_length=17, verbose_name="Número Retención") 
@@ -134,11 +136,11 @@ class Withholding(models.Model):
     def __str__(self):
         return f"Ret {self.document_number} - {self.purchase_invoice.supplier.legal_name}"
 
-class PurchaseCreditNote(models.Model):
+class PurchaseCreditNote(TenantModel):
     """
     Nota de Crédito recibida de un proveedor (Devolución / Descuento posterior).
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='purchase_credit_notes')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.PROTECT, related_name='credit_notes', verbose_name="Factura Modificada")
     
     document_number = models.CharField(max_length=17, verbose_name="Número Nota Crédito", unique=True)
@@ -163,11 +165,11 @@ class PurchaseCreditNote(models.Model):
         self.total = self.subtotal_0 + self.subtotal_15 + self.subtotal_no_obj + self.iva
         super().save(*args, **kwargs)
 
-class PurchaseDebitNote(models.Model):
+class PurchaseDebitNote(TenantModel):
     """
     Nota de Débito recibida de un proveedor (Aumento de valor / Intereses).
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='purchase_debit_notes')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     invoice = models.ForeignKey(PurchaseInvoice, on_delete=models.PROTECT, related_name='debit_notes', verbose_name="Factura Modificada")
     
     document_number = models.CharField(max_length=17, verbose_name="Número Nota Débito", unique=True)
@@ -192,7 +194,7 @@ class PurchaseDebitNote(models.Model):
         self.total = self.subtotal_0 + self.subtotal_15 + self.subtotal_no_obj + self.iva
         super().save(*args, **kwargs)
 
-class PurchaseLiquidation(models.Model):
+class PurchaseLiquidation(TenantModel):
     """
     Liquidación de Compra emitida por la institución a un proveedor (generalmente sin RUC).
     """
@@ -208,7 +210,7 @@ class PurchaseLiquidation(models.Model):
         ('20', 'Otros con utilización del sistema financiero'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='purchase_liquidations')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='liquidations')
     
     document_number = models.CharField(max_length=17, verbose_name="Número Comprobante") 
@@ -241,7 +243,8 @@ class PurchaseLiquidation(models.Model):
         self.total = self.subtotal_0 + self.subtotal_15 + self.subtotal_no_obj + self.iva
         super().save(*args, **kwargs)
 
-class PurchaseLiquidationItem(models.Model):
+class PurchaseLiquidationItem(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     liquidation = models.ForeignKey(PurchaseLiquidation, on_delete=models.CASCADE, related_name='items')
     description = models.CharField(max_length=255)
     

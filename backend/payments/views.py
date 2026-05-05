@@ -7,17 +7,19 @@ from rest_framework.decorators import action
 from payments.models import Transaction, PaymentLog, PaymentGatewayConfig
 from payments.serializers import TransactionSerializer, CheckoutSerializer, PaymentGatewayConfigSerializer
 from payments.gateways.factory import PaymentGatewayFactory
+from users.permissions import IsTreasuryStaff, IsLocalAdminUser
 
 logger = logging.getLogger(__name__)
 
 class PaymentViewSet(viewsets.ModelViewSet):
     serializer_class = TransactionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsTreasuryStaff]
 
     def get_queryset(self):
-        if hasattr(self, 'action') and self.action == 'verify_transfer' and getattr(self.request.user, 'role', '') == 'ADMIN':
+        user = self.request.user
+        if hasattr(self, 'action') and self.action == 'verify_transfer' and (user.role in ['ADMIN', 'LOCAL_ADMIN', 'ACCOUNTANT', 'RECTOR', 'SECRETARY'] or user.is_superuser):
             return Transaction.objects.all()
-        return Transaction.objects.filter(user=self.request.user)
+        return Transaction.objects.filter(user=user)
 
     @action(detail=False, methods=['post'], serializer_class=CheckoutSerializer)
     def checkout(self, request):
@@ -67,7 +69,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
             logger.exception("Error en Checkout Payment")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=False, methods=['get'], permission_classes=[IsTreasuryStaff])
     def pending_transfers(self, request):
         """
         Retorna transacciones en estado VERIFYING para que sean aprobadas/rechazadas por Admin/Tesorería.
@@ -76,7 +78,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(txns, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'], permission_classes=[IsTreasuryStaff])
     def verify_transfer(self, request, pk=None):
         """
         Aprueba o rechaza una transferencia. payload: { "action": "approve" | "reject" }
@@ -176,7 +178,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 txn.save()
                 PaymentLog.objects.create(transaction=txn, gateway_name=txn.gateway_name, event_type="manual_rejection", payload={"user_id": request.user.id})
                 return Response({"status": "Rechazado", "transaction_id": txn.id})
-    @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['delete'], permission_classes=[IsTreasuryStaff])
     def delete_transfer(self, request, pk=None):
         """
         Elimina un registro de transferencia.

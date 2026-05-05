@@ -53,6 +53,20 @@ api.interceptors.response.use(
                 return Promise.reject(refreshError);
             }
         }
+        if (error.response && error.response.status === 403 && error.response.data?.code === 'SUBSCRIPTION_SUSPENDED') {
+            const currentPath = window.location.pathname;
+            const safeRoutes = [
+                '/subscription-suspended',
+                '/dashboard/settings/billing',
+                '/login'
+            ];
+            
+            const isSafe = safeRoutes.some(route => currentPath.startsWith(route));
+            
+            if (!isSafe) {
+                window.location.replace('/subscription-suspended');
+            }
+        }
         return Promise.reject(error);
     }
 );

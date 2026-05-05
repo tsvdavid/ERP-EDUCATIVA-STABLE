@@ -20,7 +20,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 2 --timeout 60
     volumes:
       - ./backend/static:/app/static
       - ./backend/media:/app/media
@@ -55,6 +55,32 @@ services:
     depends_on:
       - backend
       - frontend
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: celery -A config worker -l info
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/media:/app/media
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: celery -A config beat -l info
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./backend/.env
 
 volumes:
   db_data:

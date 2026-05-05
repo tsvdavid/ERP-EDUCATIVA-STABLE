@@ -1,10 +1,12 @@
 from django.db import models
 from users.models import User, Institution
+from core.models import TenantModel
 
-class ProcedureTemplate(models.Model):
+class ProcedureTemplate(TenantModel):
     """
     Template for a document request, e.g. "Certificado de Matrícula", "Permiso Médico".
     """
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     ROLE_CHOICES = (
         ('RECTOR', 'Rector'),
         ('TEACHER', 'Profesor'),
@@ -12,7 +14,6 @@ class ProcedureTemplate(models.Model):
         ('LOCAL_ADMIN', 'Administrador Local'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='procedure_templates')
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, help_text="Instrucciones para el estudiante.")
     content_template = models.TextField(help_text="Texto base del documento con variables {{student_name}}, {{course_name}}, etc.")
@@ -27,7 +28,8 @@ class ProcedureTemplate(models.Model):
         return f"{self.name} - {self.institution.name}"
 
 
-class StudentRequest(models.Model):
+class StudentRequest(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     A specific request made by a student based on a template.
     """
@@ -37,7 +39,6 @@ class StudentRequest(models.Model):
         ('REJECTED', 'Rechazado'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='student_requests')
     student = models.ForeignKey(User, on_delete=models.CASCADE, related_name='procedures_requested', limit_choices_to={'role': 'STUDENT'})
     template = models.ForeignKey(ProcedureTemplate, on_delete=models.CASCADE, related_name='requests')
     

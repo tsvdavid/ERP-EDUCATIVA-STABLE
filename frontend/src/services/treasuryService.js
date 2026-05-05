@@ -135,6 +135,10 @@ const treasuryService = {
         const response = await api.post(`/treasury/invoices/${invoiceId}/send-sri/`);
         return response.data;
     },
+    preflightCheck: async (invoiceId) => {
+        const response = await api.post(`/treasury/invoices/${invoiceId}/preflight-check/`);
+        return response.data;
+    },
 
     downloadInvoiceXml: async (invoiceId) => {
         const response = await api.get(`/treasury/invoices/${invoiceId}/download_xml/`, {
@@ -142,6 +146,38 @@ const treasuryService = {
         });
         return response.data;
     },
+    sendEmail: async (invoiceId, params = {}) => {
+        const response = await api.post(`/treasury/invoices/${invoiceId}/send-email/`, null, { params });
+        return response.data;
+    },
+    sendToAltEmail: async (invoiceId, email) => {
+        const response = await api.post(`/treasury/invoices/${invoiceId}/send-to-alt-email/`, { email });
+        return response.data;
+    },
+    getEmailHistory: async (invoiceId) => {
+        const response = await api.get(`/treasury/invoices/${invoiceId}/email-history/`);
+        return response.data;
+    },
+    // Customers
+    getCustomers: async (params) => {
+        const response = await api.get('/treasury/customers/', { params });
+        if (Array.isArray(response.data)) {
+            return response.data;
+        }
+        if (response.data && Array.isArray(response.data.results)) {
+            return response.data.results;
+        }
+        return [];
+    },
+    createCustomer: async (data) => {
+        const response = await api.post('/treasury/customers/', data);
+        return response.data;
+    },
+    updateCustomer: async (id, data) => {
+        const response = await api.put(`/treasury/customers/${id}/`, data);
+        return response.data;
+    },
+
     // New Reporting Methods
     getFinancialStats: async (academicYearId = null, courseId = null) => {
         let url = '/treasury/charges/financial-stats/';
@@ -151,6 +187,14 @@ const treasuryService = {
         const queryString = params.toString();
         if (queryString) url += `?${queryString}`;
         const response = await api.get(url);
+        return response.data;
+    },
+    getCommercialDashboard: async () => {
+        const response = await api.get('/treasury/invoices/commercial-dashboard/');
+        return response.data;
+    },
+    getSriMonitoring: async (params) => {
+        const response = await api.get('/treasury/invoices/sri-monitoring/', { params });
         return response.data;
     }
 };

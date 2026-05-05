@@ -1,81 +1,78 @@
 from rest_framework import permissions
 
 class IsAdminUser(permissions.BasePermission):
-    """
-    Allows access only to Admin users (Super Admin).
-    """
+    """Acceso total: Administrador del sistema."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == 'ADMIN')
+        return bool(request.user and request.user.is_authenticated and (request.user.role == 'ADMIN' or request.user.is_superuser))
 
-class IsAdminOrLocalAdminUser(permissions.BasePermission):
-    """
-    Allows access to both Admin and Local Admin users.
-    """
+class IsLocalAdminUser(permissions.BasePermission):
+    """Acceso administrativo de la institución."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role in ['ADMIN', 'LOCAL_ADMIN'])
+        return bool(request.user and request.user.is_authenticated and request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'])
 
-class IsRectorUser(permissions.BasePermission):
-    """
-    Allows access only to Rector users.
-    """
+class IsAccountantUser(permissions.BasePermission):
+    """Perfil Contable/Tesorería."""
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == 'RECTOR')
+        return bool(request.user and request.user.is_authenticated and request.user.role == 'ACCOUNTANT')
 
-class IsTeacherUser(permissions.BasePermission):
-    """
-    Allows access only to Teacher users.
-    """
-    def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated and request.user.role == 'TEACHER')
-
-class CanManageInstitution(permissions.BasePermission):
-    """
-    Admin: Full Access (Create, Read, Update, Delete)
-    Rector: Update only (Read, Update)
-    Others: No access (or Read only if specified, but usually strictly restricted)
-    """
+class IsTreasuryStaff(permissions.BasePermission):
+    """Personal con acceso a caja y facturación."""
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-            
+        return request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT', 'SECRETARY'] or request.user.is_superuser
+
+class IsAcademicStaff(permissions.BasePermission):
+    """Personal con acceso a gestión académica."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'SECRETARY'] or request.user.is_superuser
+
+class IsHealthStaff(permissions.BasePermission):
+    """Personal del DECE y Médico."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'DECE', 'MEDICO'] or request.user.is_superuser
+
+class CanManageInstitution(permissions.BasePermission):
+    """Control sobre los datos de la institución."""
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
         if request.user.role in ['ADMIN', 'LOCAL_ADMIN'] or request.user.is_superuser:
             return True
-        
         if request.user.role == 'RECTOR':
-            # Rector cannot create or delete
-            if view.action in ['create', 'destroy']:
-                return False
+            return view.action not in ['create', 'destroy']
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.is_superuser or user.role in ['ADMIN', 'LOCAL_ADMIN']:
             return True
-            
+        if user.role == 'RECTOR':
+            return user.institution == obj
         return False
 
 class CanManageUser(permissions.BasePermission):
+    """Control sobre creación y edición de usuarios."""
     def has_permission(self, request, view):
-        # List/Create checks
         if not request.user.is_authenticated:
             return False
-            
         if view.action in ['list', 'retrieve']:
-            return True # Queryset handles visibility
-            
+            return True
         if view.action == 'create':
-             # Teachers and Accountants cannot create users
-             if request.user.role in ['TEACHER', 'ACCOUNTANT']:
-                 return False
-             return request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'] or request.user.is_superuser
-             
-        # For update/destroy, need object permission
+            if request.user.role in ['TEACHER', 'ACCOUNTANT', 'PARENT', 'STUDENT']:
+                return False
+            return request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'SECRETARY'] or request.user.is_superuser
         return True
 
     def has_object_permission(self, request, view, obj):
-        # Admin/Local Admin/Rector can manage all
-        if request.user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'] or request.user.is_superuser:
+        user = request.user
+        if user.is_superuser or user.role in ['ADMIN', 'LOCAL_ADMIN', 'RECTOR']:
             return True
-            
-        # Teacher can UPDATE Students
-        if request.user.role == 'TEACHER':
-            if view.action in ['update', 'partial_update'] and obj.role == 'STUDENT':
-                return True
-            return False
-            
+        # Los profesores pueden ver/editar ciertos datos de estudiantes asignados
+        if user.role == 'TEACHER' and obj.role == 'STUDENT':
+            return view.action in ['retrieve', 'update', 'partial_update']
         return False

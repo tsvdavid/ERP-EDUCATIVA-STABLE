@@ -1,19 +1,25 @@
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .models import Account, FiscalYear, JournalEntry, Bank, BankAccount, FixedAsset, Depreciation
-from .serializers import AccountSerializer, FiscalYearSerializer, JournalEntrySerializer, BankSerializer, BankAccountSerializer, FixedAssetSerializer
+from .models import Account, FiscalYear, MonthlyClose, JournalEntry, JournalItem, Bank, BankAccount, FixedAsset, Depreciation, AccountingConfig
+from .serializers import (
+    AccountSerializer, FiscalYearSerializer, JournalEntrySerializer, 
+    BankSerializer, BankAccountSerializer, FixedAssetSerializer,
+    AccountingConfigSerializer, MonthlyCloseSerializer
+)
 from decimal import Decimal
 from django.utils import timezone
+from users.tenant_mixins import InstitutionFilterMixin
 
-class FiscalYearViewSet(viewsets.ModelViewSet):
+class FiscalYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = FiscalYear.objects.all()
     serializer_class = FiscalYearSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return FiscalYear.objects.filter(institution=self.request.user.institution).order_by('-year')
+        return super().get_queryset().order_by('-year')
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.user.institution)
@@ -127,15 +133,46 @@ class FiscalYearViewSet(viewsets.ModelViewSet):
             'journal_entry_id': entry.id
         })
 
+class MonthlyCloseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = MonthlyClose.objects.all()
+    serializer_class = MonthlyCloseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
-class AccountViewSet(viewsets.ModelViewSet):
+    def perform_create(self, serializer):
+        # Logic to ensure the month isn't already closed via POST
+        month = serializer.validated_data.get('month')
+        year = serializer.validated_data.get('year')
+        
+        if MonthlyClose.objects.filter(institution=self.request.user.institution, year=year, month=month, is_closed=True).exists():
+             raise serializers.ValidationError("Este periodo ya se encuentra cerrado.")
+
+        serializer.save(
+            institution=self.request.user.institution,
+            closed_by=self.request.user,
+            is_closed=True,
+            closed_at=timezone.now()
+        )
+
+    @action(detail=True, methods=['post'])
+    def reopen(self, request, pk=None):
+        if not request.user.is_superuser and request.user.role not in ['ADMIN', 'LOCAL_ADMIN']:
+             return Response({'error': 'No tiene permisos para reaperturar periodos cerrados.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        close = self.get_object()
+        close.is_closed = False
+        close.save()
+        return Response({'status': 'reopened', 'message': f'Periodo {close.month}/{close.year} reaperturado.'})
+
+
+class AccountViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Account.objects.all()
     serializer_class = AccountSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        user = self.request.user
-        queryset = Account.objects.filter(institution=user.institution)
+        queryset = super().get_queryset()
         
         # Optional: Return only root accounts for tree view
         if self.request.query_params.get('roots') == 'true':
@@ -143,20 +180,17 @@ class AccountViewSet(viewsets.ModelViewSet):
             
         return queryset
 
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
-
-class JournalEntryViewSet(viewsets.ModelViewSet):
+class JournalEntryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = JournalEntry.objects.all()
     serializer_class = JournalEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return JournalEntry.objects.filter(institution=self.request.user.institution).order_by('-date', '-id')
+        return super().get_queryset().order_by('-date', '-id')
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             created_by=self.request.user
         )
 
@@ -183,27 +217,23 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
         entry.save()
         return Response({'status': 'cancelled'})
 
-class BankViewSet(viewsets.ModelViewSet):
+class BankViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Bank.objects.all()
     serializer_class = BankSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return Bank.objects.filter(institution=self.request.user.institution).order_by('name')
+        return super().get_queryset().order_by('name')
 
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
-
-class BankAccountViewSet(viewsets.ModelViewSet):
+class BankAccountViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = BankAccount.objects.all()
     serializer_class = BankAccountSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return BankAccount.objects.filter(institution=self.request.user.institution).select_related('bank', 'linked_account').order_by('bank__name', 'account_number')
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+        return super().get_queryset().select_related('bank', 'linked_account').order_by('bank__name', 'account_number')
 
 from django.db.models import Sum, Q
 
@@ -261,6 +291,56 @@ class ReportViewSet(viewsets.ViewSet):
             'total_expenses': total_expenses,
             'net_income': total_income - total_expenses
         })
+
+    @action(detail=False, methods=['get'])
+    def trial_balance(self, request):
+        """
+        Balance de Comprobación: Sumas y Saldos de todas las cuentas con movimiento.
+        """
+        user = request.user
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        from .models import Account, JournalItem
+        from django.db.models import Sum
+
+        accounts = Account.objects.filter(institution=user.institution).order_by('code')
+        data = []
+
+        for acc in accounts:
+            items = JournalItem.objects.filter(account=acc, journal_entry__state='POSTED')
+            if start_date:
+                items = items.filter(journal_entry__date__gte=start_date)
+            if end_date:
+                items = items.filter(journal_entry__date__lte=end_date)
+            
+            totals = items.aggregate(
+                sum_debit=Sum('debit'),
+                sum_credit=Sum('credit')
+            )
+            
+            debit = totals['sum_debit'] or Decimal('0.00')
+            credit = totals['sum_credit'] or Decimal('0.00')
+            
+            if debit == 0 and credit == 0:
+                continue
+
+            if acc.account_type in ['ASSET', 'EXPENSE']:
+                balance = debit - credit
+            else:
+                balance = credit - debit
+
+            data.append({
+                'id': acc.id,
+                'code': acc.code,
+                'name': acc.name,
+                'type': acc.account_type,
+                'sum_debit': debit,
+                'sum_credit': credit,
+                'balance': balance
+            })
+
+        return Response(data)
 
     def _calculate_net_income(self, institution):
         from .models import JournalItem
@@ -443,16 +523,14 @@ class ReportViewSet(viewsets.ViewSet):
             total += node['balance']
         return total
 
-class FixedAssetViewSet(viewsets.ModelViewSet):
+class FixedAssetViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = FixedAsset.objects.all()
     serializer_class = FixedAssetSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return FixedAsset.objects.filter(institution=self.request.user.institution).order_by('-purchase_date')
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+        return super().get_queryset().order_by('-purchase_date')
 
     @action(detail=True, methods=['post'])
     def calculate_depreciation(self, request, pk=None):
@@ -524,3 +602,15 @@ class FixedAssetViewSet(viewsets.ModelViewSet):
         asset.save()
         
         return Response({'status': 'ok', 'amount': total_to_depreciate, 'months': months_passed})
+
+class AccountingConfigViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = AccountingConfig.objects.all()
+    serializer_class = AccountingConfigSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related('account')
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)

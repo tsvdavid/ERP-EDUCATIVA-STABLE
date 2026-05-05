@@ -1,0 +1,429 @@
+modelo,id,clasificacion,inst_sugerida,contexto
+Observation,1,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'teacher': 'ID:3|Inst:1'}"
+Observation,2,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'teacher': 'ID:3|Inst:1'}"
+Observation,3,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'teacher': 'ID:3|Inst:1'}"
+Observation,4,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'teacher': 'ID:3|Inst:1'}"
+MedicalRecord,1,A (Recuperable),1,{'student': 'ID:5|Inst:1'}
+MedicalRecord,2,A (Recuperable),1,{'student': 'ID:54|Inst:1'}
+MedicalRecord,3,A (Recuperable),6,{'student': 'ID:154|Inst:6'}
+MedicalRecord,4,A (Recuperable),6,{'student': 'ID:156|Inst:6'}
+MedicalRecord,5,A (Recuperable),6,{'student': 'ID:157|Inst:6'}
+MedicalRecord,6,A (Recuperable),6,{'student': 'ID:158|Inst:6'}
+MedicalRecord,7,A (Recuperable),6,{'student': 'ID:159|Inst:6'}
+MedicalRecord,8,A (Recuperable),6,{'student': 'ID:160|Inst:6'}
+MedicalRecord,9,A (Recuperable),6,{'student': 'ID:161|Inst:6'}
+MedicalRecord,10,A (Recuperable),6,{'student': 'ID:162|Inst:6'}
+MedicalRecord,11,A (Recuperable),6,{'student': 'ID:163|Inst:6'}
+MedicalRecord,12,A (Recuperable),6,{'student': 'ID:164|Inst:6'}
+MedicalRecord,13,A (Recuperable),6,{'student': 'ID:165|Inst:6'}
+MedicalRecord,14,A (Recuperable),6,{'student': 'ID:166|Inst:6'}
+MedicalRecord,15,A (Recuperable),6,{'student': 'ID:167|Inst:6'}
+MedicalRecord,16,A (Recuperable),6,{'student': 'ID:168|Inst:6'}
+MedicalRecord,17,A (Recuperable),6,{'student': 'ID:169|Inst:6'}
+MedicalRecord,18,A (Recuperable),6,{'student': 'ID:170|Inst:6'}
+MedicalRecord,19,A (Recuperable),6,{'student': 'ID:171|Inst:6'}
+MedicalRecord,20,A (Recuperable),6,{'student': 'ID:172|Inst:6'}
+MedicalRecord,21,A (Recuperable),6,{'student': 'ID:173|Inst:6'}
+MedicalRecord,22,A (Recuperable),6,{'student': 'ID:174|Inst:6'}
+MedicalRecord,23,A (Recuperable),6,{'student': 'ID:175|Inst:6'}
+MedicalRecord,24,A (Recuperable),6,{'student': 'ID:176|Inst:6'}
+MedicalRecord,25,A (Recuperable),6,{'student': 'ID:177|Inst:6'}
+MedicalRecord,26,A (Recuperable),6,{'student': 'ID:178|Inst:6'}
+MedicalRecord,27,A (Recuperable),6,{'student': 'ID:179|Inst:6'}
+MedicalRecord,28,A (Recuperable),6,{'student': 'ID:180|Inst:6'}
+MedicalRecord,29,A (Recuperable),6,{'student': 'ID:181|Inst:6'}
+MedicalRecord,30,A (Recuperable),6,{'student': 'ID:182|Inst:6'}
+MedicalRecord,31,A (Recuperable),6,{'student': 'ID:183|Inst:6'}
+MedicalRecord,32,A (Recuperable),6,{'student': 'ID:184|Inst:6'}
+MedicalRecord,33,A (Recuperable),6,{'student': 'ID:185|Inst:6'}
+MedicalRecord,34,A (Recuperable),6,{'student': 'ID:186|Inst:6'}
+MedicalRecord,35,A (Recuperable),6,{'student': 'ID:187|Inst:6'}
+MedicalRecord,36,A (Recuperable),6,{'student': 'ID:188|Inst:6'}
+MedicalRecord,37,A (Recuperable),6,{'student': 'ID:189|Inst:6'}
+MedicalRecord,38,A (Recuperable),6,{'student': 'ID:190|Inst:6'}
+MedicalRecord,39,A (Recuperable),6,{'student': 'ID:191|Inst:6'}
+MedicalRecord,40,A (Recuperable),6,{'student': 'ID:192|Inst:6'}
+MedicalRecord,41,A (Recuperable),6,{'student': 'ID:193|Inst:6'}
+MedicalRecord,42,A (Recuperable),6,{'student': 'ID:194|Inst:6'}
+MedicalRecord,43,A (Recuperable),6,{'student': 'ID:195|Inst:6'}
+MedicalRecord,44,A (Recuperable),6,{'student': 'ID:196|Inst:6'}
+MedicalRecord,45,A (Recuperable),6,{'student': 'ID:197|Inst:6'}
+MedicalRecord,46,A (Recuperable),6,{'student': 'ID:198|Inst:6'}
+MedicalRecord,47,A (Recuperable),6,{'student': 'ID:199|Inst:6'}
+MedicalRecord,48,A (Recuperable),6,{'student': 'ID:200|Inst:6'}
+MedicalRecord,49,A (Recuperable),6,{'student': 'ID:201|Inst:6'}
+MedicalRecord,50,A (Recuperable),6,{'student': 'ID:202|Inst:6'}
+MedicalRecord,51,A (Recuperable),6,{'student': 'ID:203|Inst:6'}
+MedicalRecord,52,A (Recuperable),6,{'student': 'ID:204|Inst:6'}
+MedicalRecord,53,A (Recuperable),7,{'student': 'ID:220|Inst:7'}
+MedicalRecord,54,A (Recuperable),7,{'student': 'ID:221|Inst:7'}
+MedicalRecord,55,A (Recuperable),7,{'student': 'ID:222|Inst:7'}
+MedicalRecord,56,A (Recuperable),7,{'student': 'ID:223|Inst:7'}
+MedicalRecord,57,A (Recuperable),7,{'student': 'ID:224|Inst:7'}
+MedicalRecord,58,A (Recuperable),7,{'student': 'ID:225|Inst:7'}
+MedicalRecord,59,A (Recuperable),7,{'student': 'ID:226|Inst:7'}
+MedicalRecord,60,A (Recuperable),7,{'student': 'ID:227|Inst:7'}
+MedicalRecord,61,A (Recuperable),7,{'student': 'ID:228|Inst:7'}
+MedicalRecord,62,A (Recuperable),7,{'student': 'ID:229|Inst:7'}
+MedicalRecord,63,A (Recuperable),7,{'student': 'ID:230|Inst:7'}
+MedicalRecord,64,A (Recuperable),7,{'student': 'ID:231|Inst:7'}
+MedicalRecord,65,A (Recuperable),7,{'student': 'ID:232|Inst:7'}
+MedicalRecord,66,A (Recuperable),7,{'student': 'ID:233|Inst:7'}
+MedicalRecord,67,A (Recuperable),7,{'student': 'ID:234|Inst:7'}
+MedicalRecord,68,A (Recuperable),7,{'student': 'ID:235|Inst:7'}
+MedicalRecord,69,A (Recuperable),7,{'student': 'ID:236|Inst:7'}
+MedicalRecord,70,A (Recuperable),7,{'student': 'ID:237|Inst:7'}
+MedicalRecord,71,A (Recuperable),7,{'student': 'ID:238|Inst:7'}
+MedicalRecord,72,A (Recuperable),7,{'student': 'ID:239|Inst:7'}
+MedicalRecord,73,A (Recuperable),7,{'student': 'ID:240|Inst:7'}
+MedicalRecord,74,A (Recuperable),7,{'student': 'ID:241|Inst:7'}
+MedicalRecord,75,A (Recuperable),7,{'student': 'ID:242|Inst:7'}
+MedicalRecord,76,A (Recuperable),7,{'student': 'ID:243|Inst:7'}
+MedicalRecord,77,A (Recuperable),7,{'student': 'ID:244|Inst:7'}
+MedicalRecord,78,A (Recuperable),7,{'student': 'ID:245|Inst:7'}
+MedicalRecord,79,A (Recuperable),7,{'student': 'ID:246|Inst:7'}
+MedicalRecord,80,A (Recuperable),7,{'student': 'ID:247|Inst:7'}
+MedicalRecord,81,A (Recuperable),7,{'student': 'ID:248|Inst:7'}
+MedicalRecord,82,A (Recuperable),7,{'student': 'ID:249|Inst:7'}
+MedicalRecord,83,A (Recuperable),7,{'student': 'ID:250|Inst:7'}
+MedicalRecord,84,A (Recuperable),7,{'student': 'ID:251|Inst:7'}
+MedicalRecord,85,A (Recuperable),7,{'student': 'ID:252|Inst:7'}
+MedicalRecord,86,A (Recuperable),7,{'student': 'ID:253|Inst:7'}
+MedicalRecord,87,A (Recuperable),7,{'student': 'ID:254|Inst:7'}
+MedicalRecord,88,A (Recuperable),7,{'student': 'ID:255|Inst:7'}
+MedicalRecord,89,A (Recuperable),7,{'student': 'ID:256|Inst:7'}
+MedicalRecord,90,A (Recuperable),7,{'student': 'ID:257|Inst:7'}
+MedicalRecord,91,A (Recuperable),7,{'student': 'ID:258|Inst:7'}
+MedicalRecord,92,A (Recuperable),7,{'student': 'ID:259|Inst:7'}
+MedicalRecord,93,A (Recuperable),7,{'student': 'ID:260|Inst:7'}
+MedicalRecord,94,A (Recuperable),7,{'student': 'ID:261|Inst:7'}
+MedicalRecord,95,A (Recuperable),7,{'student': 'ID:262|Inst:7'}
+MedicalRecord,96,A (Recuperable),7,{'student': 'ID:263|Inst:7'}
+MedicalRecord,97,A (Recuperable),7,{'student': 'ID:264|Inst:7'}
+MedicalRecord,98,A (Recuperable),7,{'student': 'ID:265|Inst:7'}
+MedicalRecord,99,A (Recuperable),7,{'student': 'ID:266|Inst:7'}
+MedicalRecord,100,A (Recuperable),7,{'student': 'ID:267|Inst:7'}
+MedicalRecord,101,A (Recuperable),7,{'student': 'ID:268|Inst:7'}
+MedicalRecord,102,A (Recuperable),7,{'student': 'ID:269|Inst:7'}
+MedicalRecord,103,A (Recuperable),8,{'student': 'ID:285|Inst:8'}
+MedicalRecord,104,A (Recuperable),8,{'student': 'ID:286|Inst:8'}
+MedicalRecord,105,A (Recuperable),8,{'student': 'ID:287|Inst:8'}
+MedicalRecord,106,A (Recuperable),8,{'student': 'ID:288|Inst:8'}
+MedicalRecord,107,A (Recuperable),8,{'student': 'ID:289|Inst:8'}
+MedicalRecord,108,A (Recuperable),8,{'student': 'ID:290|Inst:8'}
+MedicalRecord,109,A (Recuperable),8,{'student': 'ID:291|Inst:8'}
+MedicalRecord,110,A (Recuperable),8,{'student': 'ID:292|Inst:8'}
+MedicalRecord,111,A (Recuperable),8,{'student': 'ID:293|Inst:8'}
+MedicalRecord,112,A (Recuperable),8,{'student': 'ID:294|Inst:8'}
+MedicalRecord,113,A (Recuperable),8,{'student': 'ID:295|Inst:8'}
+MedicalRecord,114,A (Recuperable),8,{'student': 'ID:296|Inst:8'}
+MedicalRecord,115,A (Recuperable),8,{'student': 'ID:297|Inst:8'}
+MedicalRecord,116,A (Recuperable),8,{'student': 'ID:298|Inst:8'}
+MedicalRecord,117,A (Recuperable),8,{'student': 'ID:299|Inst:8'}
+MedicalRecord,118,A (Recuperable),8,{'student': 'ID:300|Inst:8'}
+MedicalRecord,119,A (Recuperable),8,{'student': 'ID:301|Inst:8'}
+MedicalRecord,120,A (Recuperable),8,{'student': 'ID:302|Inst:8'}
+MedicalRecord,121,A (Recuperable),8,{'student': 'ID:303|Inst:8'}
+MedicalRecord,122,A (Recuperable),8,{'student': 'ID:304|Inst:8'}
+MedicalRecord,123,A (Recuperable),8,{'student': 'ID:305|Inst:8'}
+MedicalRecord,124,A (Recuperable),8,{'student': 'ID:306|Inst:8'}
+MedicalRecord,125,A (Recuperable),8,{'student': 'ID:307|Inst:8'}
+MedicalRecord,126,A (Recuperable),8,{'student': 'ID:308|Inst:8'}
+MedicalRecord,127,A (Recuperable),8,{'student': 'ID:309|Inst:8'}
+MedicalRecord,128,A (Recuperable),8,{'student': 'ID:310|Inst:8'}
+MedicalRecord,129,A (Recuperable),8,{'student': 'ID:311|Inst:8'}
+MedicalRecord,130,A (Recuperable),8,{'student': 'ID:312|Inst:8'}
+MedicalRecord,131,A (Recuperable),8,{'student': 'ID:313|Inst:8'}
+MedicalRecord,132,A (Recuperable),8,{'student': 'ID:314|Inst:8'}
+MedicalRecord,133,A (Recuperable),8,{'student': 'ID:315|Inst:8'}
+MedicalRecord,134,A (Recuperable),8,{'student': 'ID:316|Inst:8'}
+MedicalRecord,135,A (Recuperable),8,{'student': 'ID:317|Inst:8'}
+MedicalRecord,136,A (Recuperable),8,{'student': 'ID:318|Inst:8'}
+MedicalRecord,137,A (Recuperable),8,{'student': 'ID:319|Inst:8'}
+MedicalRecord,138,A (Recuperable),8,{'student': 'ID:320|Inst:8'}
+MedicalRecord,139,A (Recuperable),8,{'student': 'ID:321|Inst:8'}
+MedicalRecord,140,A (Recuperable),8,{'student': 'ID:322|Inst:8'}
+MedicalRecord,141,A (Recuperable),8,{'student': 'ID:323|Inst:8'}
+MedicalRecord,142,A (Recuperable),8,{'student': 'ID:324|Inst:8'}
+MedicalRecord,143,A (Recuperable),8,{'student': 'ID:325|Inst:8'}
+MedicalRecord,144,A (Recuperable),8,{'student': 'ID:326|Inst:8'}
+MedicalRecord,145,A (Recuperable),8,{'student': 'ID:327|Inst:8'}
+MedicalRecord,146,A (Recuperable),8,{'student': 'ID:328|Inst:8'}
+MedicalRecord,147,A (Recuperable),8,{'student': 'ID:329|Inst:8'}
+MedicalRecord,148,A (Recuperable),8,{'student': 'ID:330|Inst:8'}
+MedicalRecord,149,A (Recuperable),8,{'student': 'ID:331|Inst:8'}
+MedicalRecord,150,A (Recuperable),8,{'student': 'ID:332|Inst:8'}
+MedicalRecord,151,A (Recuperable),8,{'student': 'ID:333|Inst:8'}
+MedicalRecord,152,A (Recuperable),8,{'student': 'ID:334|Inst:8'}
+DeceRecord,1,A (Recuperable),1,{'student': 'ID:5|Inst:1'}
+DeceRecord,2,A (Recuperable),1,{'student': 'ID:54|Inst:1'}
+DeceRecord,3,A (Recuperable),6,{'student': 'ID:154|Inst:6'}
+DeceRecord,4,A (Recuperable),6,{'student': 'ID:156|Inst:6'}
+DeceRecord,5,A (Recuperable),6,{'student': 'ID:157|Inst:6'}
+DeceRecord,6,A (Recuperable),6,{'student': 'ID:158|Inst:6'}
+DeceRecord,7,A (Recuperable),6,{'student': 'ID:159|Inst:6'}
+DeceRecord,8,A (Recuperable),6,{'student': 'ID:160|Inst:6'}
+DeceRecord,9,A (Recuperable),6,{'student': 'ID:161|Inst:6'}
+DeceRecord,10,A (Recuperable),6,{'student': 'ID:162|Inst:6'}
+DeceRecord,11,A (Recuperable),6,{'student': 'ID:163|Inst:6'}
+DeceRecord,12,A (Recuperable),6,{'student': 'ID:164|Inst:6'}
+DeceRecord,13,A (Recuperable),6,{'student': 'ID:165|Inst:6'}
+DeceRecord,14,A (Recuperable),6,{'student': 'ID:166|Inst:6'}
+DeceRecord,15,A (Recuperable),6,{'student': 'ID:167|Inst:6'}
+DeceRecord,16,A (Recuperable),6,{'student': 'ID:168|Inst:6'}
+DeceRecord,17,A (Recuperable),6,{'student': 'ID:169|Inst:6'}
+DeceRecord,18,A (Recuperable),6,{'student': 'ID:170|Inst:6'}
+DeceRecord,19,A (Recuperable),6,{'student': 'ID:171|Inst:6'}
+DeceRecord,20,A (Recuperable),6,{'student': 'ID:172|Inst:6'}
+DeceRecord,21,A (Recuperable),6,{'student': 'ID:173|Inst:6'}
+DeceRecord,22,A (Recuperable),6,{'student': 'ID:174|Inst:6'}
+DeceRecord,23,A (Recuperable),6,{'student': 'ID:175|Inst:6'}
+DeceRecord,24,A (Recuperable),6,{'student': 'ID:176|Inst:6'}
+DeceRecord,25,A (Recuperable),6,{'student': 'ID:177|Inst:6'}
+DeceRecord,26,A (Recuperable),6,{'student': 'ID:178|Inst:6'}
+DeceRecord,27,A (Recuperable),6,{'student': 'ID:179|Inst:6'}
+DeceRecord,28,A (Recuperable),6,{'student': 'ID:180|Inst:6'}
+DeceRecord,29,A (Recuperable),6,{'student': 'ID:181|Inst:6'}
+DeceRecord,30,A (Recuperable),6,{'student': 'ID:182|Inst:6'}
+DeceRecord,31,A (Recuperable),6,{'student': 'ID:183|Inst:6'}
+DeceRecord,32,A (Recuperable),6,{'student': 'ID:184|Inst:6'}
+DeceRecord,33,A (Recuperable),6,{'student': 'ID:185|Inst:6'}
+DeceRecord,34,A (Recuperable),6,{'student': 'ID:186|Inst:6'}
+DeceRecord,35,A (Recuperable),6,{'student': 'ID:187|Inst:6'}
+DeceRecord,36,A (Recuperable),6,{'student': 'ID:188|Inst:6'}
+DeceRecord,37,A (Recuperable),6,{'student': 'ID:189|Inst:6'}
+DeceRecord,38,A (Recuperable),6,{'student': 'ID:190|Inst:6'}
+DeceRecord,39,A (Recuperable),6,{'student': 'ID:191|Inst:6'}
+DeceRecord,40,A (Recuperable),6,{'student': 'ID:192|Inst:6'}
+DeceRecord,41,A (Recuperable),6,{'student': 'ID:193|Inst:6'}
+DeceRecord,42,A (Recuperable),6,{'student': 'ID:194|Inst:6'}
+DeceRecord,43,A (Recuperable),6,{'student': 'ID:195|Inst:6'}
+DeceRecord,44,A (Recuperable),6,{'student': 'ID:196|Inst:6'}
+DeceRecord,45,A (Recuperable),6,{'student': 'ID:197|Inst:6'}
+DeceRecord,46,A (Recuperable),6,{'student': 'ID:198|Inst:6'}
+DeceRecord,47,A (Recuperable),6,{'student': 'ID:199|Inst:6'}
+DeceRecord,48,A (Recuperable),6,{'student': 'ID:200|Inst:6'}
+DeceRecord,49,A (Recuperable),6,{'student': 'ID:201|Inst:6'}
+DeceRecord,50,A (Recuperable),6,{'student': 'ID:202|Inst:6'}
+DeceRecord,51,A (Recuperable),6,{'student': 'ID:203|Inst:6'}
+DeceRecord,52,A (Recuperable),6,{'student': 'ID:204|Inst:6'}
+DeceRecord,53,A (Recuperable),7,{'student': 'ID:220|Inst:7'}
+DeceRecord,54,A (Recuperable),7,{'student': 'ID:221|Inst:7'}
+DeceRecord,55,A (Recuperable),7,{'student': 'ID:222|Inst:7'}
+DeceRecord,56,A (Recuperable),7,{'student': 'ID:223|Inst:7'}
+DeceRecord,57,A (Recuperable),7,{'student': 'ID:224|Inst:7'}
+DeceRecord,58,A (Recuperable),7,{'student': 'ID:225|Inst:7'}
+DeceRecord,59,A (Recuperable),7,{'student': 'ID:226|Inst:7'}
+DeceRecord,60,A (Recuperable),7,{'student': 'ID:227|Inst:7'}
+DeceRecord,61,A (Recuperable),7,{'student': 'ID:228|Inst:7'}
+DeceRecord,62,A (Recuperable),7,{'student': 'ID:229|Inst:7'}
+DeceRecord,63,A (Recuperable),7,{'student': 'ID:230|Inst:7'}
+DeceRecord,64,A (Recuperable),7,{'student': 'ID:231|Inst:7'}
+DeceRecord,65,A (Recuperable),7,{'student': 'ID:232|Inst:7'}
+DeceRecord,66,A (Recuperable),7,{'student': 'ID:233|Inst:7'}
+DeceRecord,67,A (Recuperable),7,{'student': 'ID:234|Inst:7'}
+DeceRecord,68,A (Recuperable),7,{'student': 'ID:235|Inst:7'}
+DeceRecord,69,A (Recuperable),7,{'student': 'ID:236|Inst:7'}
+DeceRecord,70,A (Recuperable),7,{'student': 'ID:237|Inst:7'}
+DeceRecord,71,A (Recuperable),7,{'student': 'ID:238|Inst:7'}
+DeceRecord,72,A (Recuperable),7,{'student': 'ID:239|Inst:7'}
+DeceRecord,73,A (Recuperable),7,{'student': 'ID:240|Inst:7'}
+DeceRecord,74,A (Recuperable),7,{'student': 'ID:241|Inst:7'}
+DeceRecord,75,A (Recuperable),7,{'student': 'ID:242|Inst:7'}
+DeceRecord,76,A (Recuperable),7,{'student': 'ID:243|Inst:7'}
+DeceRecord,77,A (Recuperable),7,{'student': 'ID:244|Inst:7'}
+DeceRecord,78,A (Recuperable),7,{'student': 'ID:245|Inst:7'}
+DeceRecord,79,A (Recuperable),7,{'student': 'ID:246|Inst:7'}
+DeceRecord,80,A (Recuperable),7,{'student': 'ID:247|Inst:7'}
+DeceRecord,81,A (Recuperable),7,{'student': 'ID:248|Inst:7'}
+DeceRecord,82,A (Recuperable),7,{'student': 'ID:249|Inst:7'}
+DeceRecord,83,A (Recuperable),7,{'student': 'ID:250|Inst:7'}
+DeceRecord,84,A (Recuperable),7,{'student': 'ID:251|Inst:7'}
+DeceRecord,85,A (Recuperable),7,{'student': 'ID:252|Inst:7'}
+DeceRecord,86,A (Recuperable),7,{'student': 'ID:253|Inst:7'}
+DeceRecord,87,A (Recuperable),7,{'student': 'ID:254|Inst:7'}
+DeceRecord,88,A (Recuperable),7,{'student': 'ID:255|Inst:7'}
+DeceRecord,89,A (Recuperable),7,{'student': 'ID:256|Inst:7'}
+DeceRecord,90,A (Recuperable),7,{'student': 'ID:257|Inst:7'}
+DeceRecord,91,A (Recuperable),7,{'student': 'ID:258|Inst:7'}
+DeceRecord,92,A (Recuperable),7,{'student': 'ID:259|Inst:7'}
+DeceRecord,93,A (Recuperable),7,{'student': 'ID:260|Inst:7'}
+DeceRecord,94,A (Recuperable),7,{'student': 'ID:261|Inst:7'}
+DeceRecord,95,A (Recuperable),7,{'student': 'ID:262|Inst:7'}
+DeceRecord,96,A (Recuperable),7,{'student': 'ID:263|Inst:7'}
+DeceRecord,97,A (Recuperable),7,{'student': 'ID:264|Inst:7'}
+DeceRecord,98,A (Recuperable),7,{'student': 'ID:265|Inst:7'}
+DeceRecord,99,A (Recuperable),7,{'student': 'ID:266|Inst:7'}
+DeceRecord,100,A (Recuperable),7,{'student': 'ID:267|Inst:7'}
+DeceRecord,101,A (Recuperable),7,{'student': 'ID:268|Inst:7'}
+DeceRecord,102,A (Recuperable),7,{'student': 'ID:269|Inst:7'}
+DeceRecord,103,A (Recuperable),8,{'student': 'ID:285|Inst:8'}
+DeceRecord,104,A (Recuperable),8,{'student': 'ID:286|Inst:8'}
+DeceRecord,105,A (Recuperable),8,{'student': 'ID:287|Inst:8'}
+DeceRecord,106,A (Recuperable),8,{'student': 'ID:288|Inst:8'}
+DeceRecord,107,A (Recuperable),8,{'student': 'ID:289|Inst:8'}
+DeceRecord,108,A (Recuperable),8,{'student': 'ID:290|Inst:8'}
+DeceRecord,109,A (Recuperable),8,{'student': 'ID:291|Inst:8'}
+DeceRecord,110,A (Recuperable),8,{'student': 'ID:292|Inst:8'}
+DeceRecord,111,A (Recuperable),8,{'student': 'ID:293|Inst:8'}
+DeceRecord,112,A (Recuperable),8,{'student': 'ID:294|Inst:8'}
+DeceRecord,113,A (Recuperable),8,{'student': 'ID:295|Inst:8'}
+DeceRecord,114,A (Recuperable),8,{'student': 'ID:296|Inst:8'}
+DeceRecord,115,A (Recuperable),8,{'student': 'ID:297|Inst:8'}
+DeceRecord,116,A (Recuperable),8,{'student': 'ID:298|Inst:8'}
+DeceRecord,117,A (Recuperable),8,{'student': 'ID:299|Inst:8'}
+DeceRecord,118,A (Recuperable),8,{'student': 'ID:300|Inst:8'}
+DeceRecord,119,A (Recuperable),8,{'student': 'ID:301|Inst:8'}
+DeceRecord,120,A (Recuperable),8,{'student': 'ID:302|Inst:8'}
+DeceRecord,121,A (Recuperable),8,{'student': 'ID:303|Inst:8'}
+DeceRecord,122,A (Recuperable),8,{'student': 'ID:304|Inst:8'}
+DeceRecord,123,A (Recuperable),8,{'student': 'ID:305|Inst:8'}
+DeceRecord,124,A (Recuperable),8,{'student': 'ID:306|Inst:8'}
+DeceRecord,125,A (Recuperable),8,{'student': 'ID:307|Inst:8'}
+DeceRecord,126,A (Recuperable),8,{'student': 'ID:308|Inst:8'}
+DeceRecord,127,A (Recuperable),8,{'student': 'ID:309|Inst:8'}
+DeceRecord,128,A (Recuperable),8,{'student': 'ID:310|Inst:8'}
+DeceRecord,129,A (Recuperable),8,{'student': 'ID:311|Inst:8'}
+DeceRecord,130,A (Recuperable),8,{'student': 'ID:312|Inst:8'}
+DeceRecord,131,A (Recuperable),8,{'student': 'ID:313|Inst:8'}
+DeceRecord,132,A (Recuperable),8,{'student': 'ID:314|Inst:8'}
+DeceRecord,133,A (Recuperable),8,{'student': 'ID:315|Inst:8'}
+DeceRecord,134,A (Recuperable),8,{'student': 'ID:316|Inst:8'}
+DeceRecord,135,A (Recuperable),8,{'student': 'ID:317|Inst:8'}
+DeceRecord,136,A (Recuperable),8,{'student': 'ID:318|Inst:8'}
+DeceRecord,137,A (Recuperable),8,{'student': 'ID:319|Inst:8'}
+DeceRecord,138,A (Recuperable),8,{'student': 'ID:320|Inst:8'}
+DeceRecord,139,A (Recuperable),8,{'student': 'ID:321|Inst:8'}
+DeceRecord,140,A (Recuperable),8,{'student': 'ID:322|Inst:8'}
+DeceRecord,141,A (Recuperable),8,{'student': 'ID:323|Inst:8'}
+DeceRecord,142,A (Recuperable),8,{'student': 'ID:324|Inst:8'}
+DeceRecord,143,A (Recuperable),8,{'student': 'ID:325|Inst:8'}
+DeceRecord,144,A (Recuperable),8,{'student': 'ID:326|Inst:8'}
+DeceRecord,145,A (Recuperable),8,{'student': 'ID:327|Inst:8'}
+DeceRecord,146,A (Recuperable),8,{'student': 'ID:328|Inst:8'}
+DeceRecord,147,A (Recuperable),8,{'student': 'ID:329|Inst:8'}
+DeceRecord,148,A (Recuperable),8,{'student': 'ID:330|Inst:8'}
+DeceRecord,149,A (Recuperable),8,{'student': 'ID:331|Inst:8'}
+DeceRecord,150,A (Recuperable),8,{'student': 'ID:332|Inst:8'}
+DeceRecord,151,A (Recuperable),8,{'student': 'ID:333|Inst:8'}
+DeceRecord,152,A (Recuperable),8,{'student': 'ID:334|Inst:8'}
+MedicalVisit,2,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'doctor': 'ID:1|Inst:1'}"
+MedicalVisit,1,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'doctor': 'ID:1|Inst:1'}"
+DeceVisit,2,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'counselor': 'ID:1|Inst:1'}"
+DeceVisit,1,A (Recuperable),1,"{'student': 'ID:5|Inst:1', 'counselor': 'ID:1|Inst:1'}"
+BehaviorRecord,60,A (Recuperable),8,"{'student': 'ID:289|Inst:8', 'created_by': 'ID:279|Inst:8', 'academic_year': 'ID:10|Inst:8'}"
+BehaviorRecord,59,A (Recuperable),8,"{'student': 'ID:288|Inst:8', 'created_by': 'ID:278|Inst:8', 'academic_year': 'ID:10|Inst:8'}"
+BehaviorRecord,58,A (Recuperable),8,"{'student': 'ID:287|Inst:8', 'created_by': 'ID:280|Inst:8', 'academic_year': 'ID:10|Inst:8'}"
+BehaviorRecord,57,A (Recuperable),8,"{'student': 'ID:286|Inst:8', 'created_by': 'ID:284|Inst:8', 'academic_year': 'ID:10|Inst:8'}"
+BehaviorRecord,56,A (Recuperable),8,"{'student': 'ID:285|Inst:8', 'created_by': 'ID:275|Inst:8', 'academic_year': 'ID:10|Inst:8'}"
+BehaviorRecord,55,A (Recuperable),7,"{'student': 'ID:224|Inst:7', 'created_by': 'ID:214|Inst:7', 'academic_year': 'ID:9|Inst:7'}"
+BehaviorRecord,54,A (Recuperable),7,"{'student': 'ID:223|Inst:7', 'created_by': 'ID:215|Inst:7', 'academic_year': 'ID:9|Inst:7'}"
+BehaviorRecord,53,A (Recuperable),7,"{'student': 'ID:222|Inst:7', 'created_by': 'ID:216|Inst:7', 'academic_year': 'ID:9|Inst:7'}"
+BehaviorRecord,52,A (Recuperable),7,"{'student': 'ID:221|Inst:7', 'created_by': 'ID:214|Inst:7', 'academic_year': 'ID:9|Inst:7'}"
+BehaviorRecord,51,A (Recuperable),7,"{'student': 'ID:220|Inst:7', 'created_by': 'ID:211|Inst:7', 'academic_year': 'ID:9|Inst:7'}"
+BehaviorRecord,50,A (Recuperable),6,"{'student': 'ID:159|Inst:6', 'created_by': 'ID:145|Inst:6', 'academic_year': 'ID:8|Inst:6'}"
+BehaviorRecord,49,A (Recuperable),6,"{'student': 'ID:158|Inst:6', 'created_by': 'ID:152|Inst:6', 'academic_year': 'ID:8|Inst:6'}"
+BehaviorRecord,48,A (Recuperable),6,"{'student': 'ID:157|Inst:6', 'created_by': 'ID:145|Inst:6', 'academic_year': 'ID:8|Inst:6'}"
+BehaviorRecord,47,A (Recuperable),6,"{'student': 'ID:156|Inst:6', 'created_by': 'ID:145|Inst:6', 'academic_year': 'ID:8|Inst:6'}"
+BehaviorRecord,46,A (Recuperable),6,"{'student': 'ID:154|Inst:6', 'created_by': 'ID:148|Inst:6', 'academic_year': 'ID:8|Inst:6'}"
+BehaviorRecord,45,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,44,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,43,A (Recuperable),1,"{'student': 'ID:52|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:72|Inst:1', 'course': 'ID:12|Inst:1'}"
+BehaviorRecord,42,A (Recuperable),1,"{'student': 'ID:44|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'course': 'ID:12|Inst:1'}"
+BehaviorRecord,21,A (Recuperable),1,"{'student': 'ID:55|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,20,A (Recuperable),1,"{'student': 'ID:56|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:78|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,19,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:78|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,18,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:78|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,17,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,16,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,15,A (Recuperable),1,"{'student': 'ID:56|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:78|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,14,A (Recuperable),1,"{'student': 'ID:55|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,13,A (Recuperable),1,"{'student': 'ID:58|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,12,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,11,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,10,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,9,A (Recuperable),1,"{'student': 'ID:56|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:78|Inst:1', 'course': 'ID:13|Inst:1'}"
+BehaviorRecord,8,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,7,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,6,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,5,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,4,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,3,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,2,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,1,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'created_by': 'ID:37|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+BehaviorRecord,41,A (Recuperable),1,"{'student': 'ID:88|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,40,A (Recuperable),1,"{'student': 'ID:45|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,37,A (Recuperable),1,"{'student': 'ID:96|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,28,A (Recuperable),1,"{'student': 'ID:90|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,36,A (Recuperable),1,"{'student': 'ID:97|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,38,A (Recuperable),1,"{'student': 'ID:45|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,29,A (Recuperable),1,"{'student': 'ID:44|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,23,A (Recuperable),1,"{'student': 'ID:48|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,34,A (Recuperable),1,"{'student': 'ID:98|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,33,A (Recuperable),1,"{'student': 'ID:66|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,30,A (Recuperable),1,"{'student': 'ID:69|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,24,A (Recuperable),1,"{'student': 'ID:95|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,22,A (Recuperable),1,"{'student': 'ID:62|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,27,A (Recuperable),1,"{'student': 'ID:56|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,35,A (Recuperable),1,"{'student': 'ID:82|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,31,A (Recuperable),1,"{'student': 'ID:49|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,26,A (Recuperable),1,"{'student': 'ID:58|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,39,A (Recuperable),1,"{'student': 'ID:46|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,32,A (Recuperable),1,"{'student': 'ID:51|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorRecord,25,A (Recuperable),1,"{'student': 'ID:71|Inst:1', 'created_by': 'ID:1|Inst:1', 'academic_year': 'ID:4|Inst:1', 'subject': 'ID:1|Inst:1', 'course': 'ID:1|Inst:1'}"
+BehaviorCase,25,A (Recuperable),8,"{'student': 'ID:289|Inst:8', 'academic_year': 'ID:10|Inst:8', 'assigned_to': 'ID:272|Inst:8', 'created_by': 'ID:271|Inst:8'}"
+BehaviorCase,24,A (Recuperable),8,"{'student': 'ID:288|Inst:8', 'academic_year': 'ID:10|Inst:8', 'assigned_to': 'ID:272|Inst:8', 'created_by': 'ID:271|Inst:8'}"
+BehaviorCase,23,A (Recuperable),8,"{'student': 'ID:287|Inst:8', 'academic_year': 'ID:10|Inst:8', 'assigned_to': 'ID:272|Inst:8', 'created_by': 'ID:271|Inst:8'}"
+BehaviorCase,22,A (Recuperable),8,"{'student': 'ID:286|Inst:8', 'academic_year': 'ID:10|Inst:8', 'assigned_to': 'ID:272|Inst:8', 'created_by': 'ID:271|Inst:8'}"
+BehaviorCase,21,A (Recuperable),8,"{'student': 'ID:285|Inst:8', 'academic_year': 'ID:10|Inst:8', 'assigned_to': 'ID:272|Inst:8', 'created_by': 'ID:271|Inst:8'}"
+BehaviorCase,20,A (Recuperable),7,"{'student': 'ID:224|Inst:7', 'academic_year': 'ID:9|Inst:7', 'assigned_to': 'ID:207|Inst:7', 'created_by': 'ID:206|Inst:7'}"
+BehaviorCase,19,A (Recuperable),7,"{'student': 'ID:223|Inst:7', 'academic_year': 'ID:9|Inst:7', 'assigned_to': 'ID:207|Inst:7', 'created_by': 'ID:206|Inst:7'}"
+BehaviorCase,18,A (Recuperable),7,"{'student': 'ID:222|Inst:7', 'academic_year': 'ID:9|Inst:7', 'assigned_to': 'ID:207|Inst:7', 'created_by': 'ID:206|Inst:7'}"
+BehaviorCase,17,A (Recuperable),7,"{'student': 'ID:221|Inst:7', 'academic_year': 'ID:9|Inst:7', 'assigned_to': 'ID:207|Inst:7', 'created_by': 'ID:206|Inst:7'}"
+BehaviorCase,16,A (Recuperable),7,"{'student': 'ID:220|Inst:7', 'academic_year': 'ID:9|Inst:7', 'assigned_to': 'ID:207|Inst:7', 'created_by': 'ID:206|Inst:7'}"
+BehaviorCase,15,A (Recuperable),6,"{'student': 'ID:159|Inst:6', 'academic_year': 'ID:8|Inst:6', 'assigned_to': 'ID:141|Inst:6', 'created_by': 'ID:140|Inst:6'}"
+BehaviorCase,14,A (Recuperable),6,"{'student': 'ID:158|Inst:6', 'academic_year': 'ID:8|Inst:6', 'assigned_to': 'ID:141|Inst:6', 'created_by': 'ID:140|Inst:6'}"
+BehaviorCase,13,A (Recuperable),6,"{'student': 'ID:157|Inst:6', 'academic_year': 'ID:8|Inst:6', 'assigned_to': 'ID:141|Inst:6', 'created_by': 'ID:140|Inst:6'}"
+BehaviorCase,12,A (Recuperable),6,"{'student': 'ID:156|Inst:6', 'academic_year': 'ID:8|Inst:6', 'assigned_to': 'ID:141|Inst:6', 'created_by': 'ID:140|Inst:6'}"
+BehaviorCase,11,A (Recuperable),6,"{'student': 'ID:154|Inst:6', 'academic_year': 'ID:8|Inst:6', 'assigned_to': 'ID:141|Inst:6', 'created_by': 'ID:140|Inst:6'}"
+BehaviorCase,10,A (Recuperable),1,"{'student': 'ID:91|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,9,A (Recuperable),1,"{'student': 'ID:89|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,8,A (Recuperable),1,"{'student': 'ID:95|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,7,A (Recuperable),1,"{'student': 'ID:57|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,6,A (Recuperable),1,"{'student': 'ID:55|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,5,A (Recuperable),1,"{'student': 'ID:81|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,4,A (Recuperable),1,"{'student': 'ID:65|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,3,A (Recuperable),1,"{'student': 'ID:44|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,2,A (Recuperable),1,"{'student': 'ID:86|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+BehaviorCase,1,A (Recuperable),1,"{'student': 'ID:44|Inst:1', 'academic_year': 'ID:4|Inst:1', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,25,A (Recuperable),8,"{'case': 'ID:25|Inst:None', 'created_by': 'ID:272|Inst:8'}"
+CaseFollowUp,24,A (Recuperable),8,"{'case': 'ID:24|Inst:None', 'created_by': 'ID:272|Inst:8'}"
+CaseFollowUp,23,A (Recuperable),8,"{'case': 'ID:23|Inst:None', 'created_by': 'ID:272|Inst:8'}"
+CaseFollowUp,22,A (Recuperable),8,"{'case': 'ID:22|Inst:None', 'created_by': 'ID:272|Inst:8'}"
+CaseFollowUp,21,A (Recuperable),8,"{'case': 'ID:21|Inst:None', 'created_by': 'ID:272|Inst:8'}"
+CaseFollowUp,20,A (Recuperable),7,"{'case': 'ID:20|Inst:None', 'created_by': 'ID:207|Inst:7'}"
+CaseFollowUp,19,A (Recuperable),7,"{'case': 'ID:19|Inst:None', 'created_by': 'ID:207|Inst:7'}"
+CaseFollowUp,18,A (Recuperable),7,"{'case': 'ID:18|Inst:None', 'created_by': 'ID:207|Inst:7'}"
+CaseFollowUp,17,A (Recuperable),7,"{'case': 'ID:17|Inst:None', 'created_by': 'ID:207|Inst:7'}"
+CaseFollowUp,16,A (Recuperable),7,"{'case': 'ID:16|Inst:None', 'created_by': 'ID:207|Inst:7'}"
+CaseFollowUp,15,A (Recuperable),6,"{'case': 'ID:15|Inst:None', 'created_by': 'ID:141|Inst:6'}"
+CaseFollowUp,14,A (Recuperable),6,"{'case': 'ID:14|Inst:None', 'created_by': 'ID:141|Inst:6'}"
+CaseFollowUp,13,A (Recuperable),6,"{'case': 'ID:13|Inst:None', 'created_by': 'ID:141|Inst:6'}"
+CaseFollowUp,12,A (Recuperable),6,"{'case': 'ID:12|Inst:None', 'created_by': 'ID:141|Inst:6'}"
+CaseFollowUp,11,A (Recuperable),6,"{'case': 'ID:11|Inst:None', 'created_by': 'ID:141|Inst:6'}"
+CaseFollowUp,10,A (Recuperable),1,"{'case': 'ID:10|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,9,A (Recuperable),1,"{'case': 'ID:9|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,8,A (Recuperable),1,"{'case': 'ID:8|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,7,A (Recuperable),1,"{'case': 'ID:7|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,6,A (Recuperable),1,"{'case': 'ID:6|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,5,A (Recuperable),1,"{'case': 'ID:5|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,4,A (Recuperable),1,"{'case': 'ID:4|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,3,A (Recuperable),1,"{'case': 'ID:3|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,2,A (Recuperable),1,"{'case': 'ID:2|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+CaseFollowUp,1,A (Recuperable),1,"{'case': 'ID:1|Inst:None', 'created_by': 'ID:1|Inst:1'}"
+StudentRiskProfile,3,A (Recuperable),1,"{'student': 'ID:58|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+StudentRiskProfile,2,A (Recuperable),1,"{'student': 'ID:56|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+StudentRiskProfile,4,A (Recuperable),1,"{'student': 'ID:55|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+StudentRiskProfile,5,A (Recuperable),1,"{'student': 'ID:44|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+StudentRiskProfile,6,A (Recuperable),1,"{'student': 'ID:52|Inst:1', 'academic_year': 'ID:4|Inst:1'}"
+StudentRiskProfile,1,A (Recuperable),1,"{'student': 'ID:54|Inst:1', 'academic_year': 'ID:4|Inst:1'}"

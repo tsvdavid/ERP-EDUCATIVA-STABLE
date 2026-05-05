@@ -3,23 +3,22 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Supplier, PurchaseInvoice, PurchaseCreditNote, PurchaseDebitNote, PurchaseLiquidation
 from .serializers import SupplierSerializer, PurchaseInvoiceSerializer, PurchaseCreditNoteSerializer, PurchaseDebitNoteSerializer, PurchaseLiquidationSerializer
+from users.tenant_mixins import InstitutionFilterMixin
 
-class SupplierViewSet(viewsets.ModelViewSet):
+class SupplierViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = Supplier.objects.all()
     serializer_class = SupplierSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
-    def get_queryset(self):
-        return Supplier.objects.filter(institution=self.request.user.institution)
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
-
-class PurchaseInvoiceViewSet(viewsets.ModelViewSet):
+class PurchaseInvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = PurchaseInvoice.objects.all()
     serializer_class = PurchaseInvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return PurchaseInvoice.objects.filter(institution=self.request.user.institution).select_related(
+        return super().get_queryset().select_related(
             'supplier', 'withholding'
         ).prefetch_related(
             'items', 'items__expense_account'
@@ -27,7 +26,6 @@ class PurchaseInvoiceViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             created_by=self.request.user
         )
 
@@ -54,42 +52,46 @@ class PurchaseInvoiceViewSet(viewsets.ModelViewSet):
         
         return Response({'status': 'cancelled'})
 
-class PurchaseCreditNoteViewSet(viewsets.ModelViewSet):
+class PurchaseCreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = PurchaseCreditNote.objects.all()
     serializer_class = PurchaseCreditNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return PurchaseCreditNote.objects.filter(institution=self.request.user.institution).select_related(
+        return super().get_queryset().select_related(
             'invoice', 'invoice__supplier'
         ).order_by('-issue_date')
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             created_by=self.request.user
         )
 
-class PurchaseDebitNoteViewSet(viewsets.ModelViewSet):
+class PurchaseDebitNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = PurchaseDebitNote.objects.all()
     serializer_class = PurchaseDebitNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return PurchaseDebitNote.objects.filter(institution=self.request.user.institution).select_related(
+        return super().get_queryset().select_related(
             'invoice', 'invoice__supplier'
         ).order_by('-issue_date')
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             created_by=self.request.user
         )
 
-class PurchaseLiquidationViewSet(viewsets.ModelViewSet):
+class PurchaseLiquidationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = PurchaseLiquidation.objects.all()
     serializer_class = PurchaseLiquidationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        return PurchaseLiquidation.objects.filter(institution=self.request.user.institution).select_related(
+        return super().get_queryset().select_related(
             'supplier'
         ).prefetch_related(
             'items', 'items__expense_account'
@@ -97,7 +99,6 @@ class PurchaseLiquidationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             created_by=self.request.user
         )
 

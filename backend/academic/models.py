@@ -2,6 +2,7 @@ from django.db import models
 from users.models import Institution, User
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator, MaxValueValidator
+from core.models import TenantModel
 
 def get_qualitative_grade(score, scale_type='QUALITATIVE_DESTREZAS'):
     if score is None:
@@ -29,8 +30,7 @@ def get_qualitative_grade(score, scale_type='QUALITATIVE_DESTREZAS'):
         elif val >= 5.0: return "I"
         else: return "NE"
 
-class AcademicYear(models.Model):
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='academic_years')
+class AcademicYear(TenantModel):
     name = models.CharField(max_length=100)  # e.g., "2024-2025"
     year = models.IntegerField(help_text="Identificador numérico del año")  # To link with Course.year
     start_date = models.DateField()
@@ -52,7 +52,7 @@ class AcademicYear(models.Model):
             AcademicYear.objects.filter(institution=self.institution, is_active=True).exclude(pk=self.pk).update(is_active=False)
         super().save(*args, **kwargs)
 
-class AcademicPeriod(models.Model):
+class AcademicPeriod(TenantModel):
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE, related_name='periods')
     number = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(3)],
@@ -71,14 +71,13 @@ class AcademicPeriod(models.Model):
     def __str__(self):
         return f"Trimestre {self.number} - {self.academic_year.name}"
 
-class Course(models.Model):
+class Course(TenantModel):
     class GradingType(models.TextChoices):
         QUANTITATIVE = 'QUANTITATIVE', _('Cuantitativa (0-10)')
         QUALITATIVE_DESTREZAS = 'QUALITATIVE_DESTREZAS', _('Cualitativa - Destrezas (DA, EP, I, NE)')
         QUALITATIVE_PROYECTOS = 'QUALITATIVE_PROYECTOS', _('Cualitativa - Proyectos (EX, MB, B, R)')
         QUALITATIVE_COMPORTAMIENTO = 'QUALITATIVE_COMPORTAMIENTO', _('Cualitativa - Comportamiento (A, B, C, D, E)')
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='courses')
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     level = models.CharField(max_length=50, blank=True) # e.g., "Primaria", "Secundaria"
@@ -95,7 +94,7 @@ class Course(models.Model):
     def __str__(self):
         return f"{self.name} {self.parallel} ({self.year})"
 
-class Subject(models.Model):
+class Subject(TenantModel):
     class SubjectGradingType(models.TextChoices):
         INHERIT = 'INHERIT', _('Heredar del Curso')
         QUANTITATIVE = 'QUANTITATIVE', _('Cuantitativa (0-10)')
@@ -112,17 +111,17 @@ class Subject(models.Model):
         return f"{self.name} - {self.course}"
 
     class Meta:
-        unique_together = ('course', 'name')
+        unique_together = ('course', 'name', 'institution')
         verbose_name = _("Materia")
         verbose_name_plural = _("Materias")
 
-class Enrollment(models.Model):
+class Enrollment(TenantModel):
     student = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'STUDENT'}, related_name='enrollments')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
     date_enrolled = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ('student', 'course')
+        unique_together = ('student', 'course', 'institution')
 
     def __str__(self):
         return f"{self.student} -> {self.course}"
@@ -139,7 +138,7 @@ class Enrollment(models.Model):
             
             def calc_trim(trim_num):
                  # Root categories for this trimester
-                 main_cats = [c for c in categories if c.trimester == trim_num] # and c.parent_category_id is None]
+                 main_cats = [c for c in categories if c.trimester == trim_num and c.parent_category_id is None]
                  
                  if not main_cats:
                      return 0.0
@@ -199,7 +198,7 @@ class Enrollment(models.Model):
             
         return summary
 
-class EvaluationCategory(models.Model):
+class EvaluationCategory(TenantModel):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='evaluation_categories')
     name = models.CharField(max_length=100) # e.g., "Parcial 1", "Deberes"
     weight = models.DecimalField(max_digits=5, decimal_places=2, default=100.00) # Percentage link 30.00
@@ -207,7 +206,7 @@ class EvaluationCategory(models.Model):
         choices=[(1, 'Trimestre 1'), (2, 'Trimestre 2'), (3, 'Trimestre 3')], 
         default=1
     )
-    # parent_category = models.ForeignKey('self', null=True, blank=True, related_name='subcategories', on_delete=models.CASCADE, help_text="Dejar en blanco si es categoría principal. Si se selecciona, este aporte será sub-aporte de dicha categoría.")
+    parent_category = models.ForeignKey('self', null=True, blank=True, related_name='subcategories', on_delete=models.CASCADE, help_text="Dejar en blanco si es categoría principal. Si se selecciona, este aporte será sub-aporte de dicha categoría.")
     
     class Meta:
         verbose_name = "Categoría de Evaluación"
@@ -216,7 +215,7 @@ class EvaluationCategory(models.Model):
     def __str__(self):
         return f"{self.name} ({self.weight}%) - {self.subject}"
 
-class Grade(models.Model):
+class Grade(TenantModel):
     enrollment = models.ForeignKey(Enrollment, on_delete=models.CASCADE, related_name='grades')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='grades') 
     category = models.ForeignKey(EvaluationCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='grades')
@@ -228,7 +227,7 @@ class Grade(models.Model):
     def __str__(self):
         return f"{self.enrollment.student} - {self.subject}: {self.score}"
 
-class Attendance(models.Model):
+class Attendance(TenantModel):
     class Status(models.TextChoices):
         PRESENT = 'PRESENT', _('Presente')
         ABSENT = 'ABSENT', _('Ausente')
@@ -241,9 +240,9 @@ class Attendance(models.Model):
     remarks = models.TextField(blank=True)
 
     class Meta:
-        unique_together = ('enrollment', 'date')
+        unique_together = ('enrollment', 'date', 'institution')
 
-class Observation(models.Model):
+class Observation(TenantModel):
     class Type(models.TextChoices):
         BEHAVIORAL = 'BEHAVIORAL', _('Conductual')
         ACADEMIC = 'ACADEMIC', _('Académica')
@@ -287,7 +286,7 @@ class Observation(models.Model):
     def __str__(self):
         return f"{self.get_type_display()} - {self.student}: {self.criticality}"
 
-class ClassSchedule(models.Model):
+class ClassSchedule(TenantModel):
     class DayOfWeek(models.IntegerChoices):
         MONDAY = 1, _('Lunes')
         TUESDAY = 2, _('Martes')
@@ -306,7 +305,7 @@ class ClassSchedule(models.Model):
         ordering = ['day_of_week', 'start_time']
         verbose_name = _('Horario de Clase')
         verbose_name_plural = _('Horarios de Clases')
-        unique_together = ('subject', 'day_of_week', 'start_time', 'end_time')
+        unique_together = ('subject', 'day_of_week', 'start_time', 'end_time', 'institution')
 
     def __str__(self):
         return f"{self.subject} - {self.get_day_of_week_display()} ({self.start_time.strftime('%H:%M')} a {self.end_time.strftime('%H:%M')})"

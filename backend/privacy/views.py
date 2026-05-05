@@ -10,7 +10,7 @@ from .serializers import (
 )
 from django.db.models import Q
 from users.models import Institution
-from users.permissions import IsAdminOrLocalAdminUser
+from users.permissions import IsAdminUser, IsLocalAdminUser
 
 class PolicyVersionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PolicyVersion.objects.filter(is_active=True).order_by('-published_at')
@@ -64,12 +64,9 @@ class ARCORequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         institution = self.request.user.institution
         if not institution:
-            # Fallback: try to find the first available institution (common in dev/single-tenant)
-            institution = Institution.objects.first()
-            
-        if not institution:
-            # If still no institution, we can't create the request
-            raise serializers.ValidationError({"institution": "No institution associated with this user."})
+            # BLOQUEO: Ya no permitimos fallback a Institution.objects.first()
+            # Esto evita que peticiones de privacidad se asignen a la institución equivocada
+            raise serializers.ValidationError({"institution": "No hay una institución asociada a su cuenta de usuario."})
 
         serializer.save(institution=institution, requester=self.request.user)
 

@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     PaymentConceptViewSet, PaymentMethodViewSet, InvoiceViewSet, 
-    StudentAccountViewSet, ChargeViewSet, CreditNoteViewSet, DebitNoteViewSet
+    StudentAccountViewSet, ChargeViewSet, CreditNoteViewSet, DebitNoteViewSet, CustomerViewSet
 )
 
 router = DefaultRouter()
@@ -11,6 +11,7 @@ router.register(r'methods', PaymentMethodViewSet)
 router.register(r'invoices', InvoiceViewSet)
 router.register(r'accounts', StudentAccountViewSet)
 router.register(r'charges', ChargeViewSet)
+router.register(r'customers', CustomerViewSet)
 router.register(r'credit-notes', CreditNoteViewSet, basename='credit-note')
 router.register(r'debit-notes', DebitNoteViewSet, basename='debit-note')
 

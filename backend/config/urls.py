@@ -24,15 +24,18 @@ urlpatterns = [
     path('api/treasury/', include('treasury.urls')),
     path('api/accounting/', include('accounting.urls')),
     path('api/purchases/', include('purchases.urls')),
+    path('api/payroll/', include('payroll.urls')),
     path('api/helpdesk/', include('helpdesk.urls')),
     path('api/privacy/', include('privacy.urls')),
     path('api/maintenance/', include('maintenance.urls')),
+    path('api/subscriptions/', include('subscriptions.urls')),
     path('api/payments/', include('payments.urls')),
     path('api/procedures/', include('procedures.urls')),
     path('api/learning/', include('learning.urls')),
     path('api/knowledge/', include('knowledge.urls')),
     path('api/ai/', include('ai.urls')),
     path('api/health/', include('health.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 from django.conf import settings

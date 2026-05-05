@@ -1,6 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AccountViewSet, JournalEntryViewSet, ReportViewSet, BankViewSet, BankAccountViewSet, FixedAssetViewSet, FiscalYearViewSet
+from .views import (
+    AccountViewSet, JournalEntryViewSet, ReportViewSet, 
+    BankViewSet, BankAccountViewSet, FixedAssetViewSet, 
+    FiscalYearViewSet, AccountingConfigViewSet, MonthlyCloseViewSet
+)
 
 router = DefaultRouter()
 router.register(r'accounts', AccountViewSet)
@@ -10,6 +14,8 @@ router.register(r'banks', BankViewSet)
 router.register(r'bank-accounts', BankAccountViewSet)
 router.register(r'fixed-assets', FixedAssetViewSet)
 router.register(r'fiscal-years', FiscalYearViewSet)
+router.register(r'monthly-closures', MonthlyCloseViewSet)
+router.register(r'config', AccountingConfigViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),

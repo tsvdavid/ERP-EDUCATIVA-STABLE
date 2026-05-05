@@ -1,9 +1,10 @@
 from django.db import models
 from users.models import Institution, User
 from django.core.exceptions import ValidationError
+from core.models import TenantModel
 
-class FiscalYear(models.Model):
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='fiscal_years')
+class FiscalYear(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     year = models.PositiveIntegerField()
     is_closed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -14,7 +15,24 @@ class FiscalYear(models.Model):
     def __str__(self):
         return f"{self.year} - {self.institution.name}"
 
-class Account(models.Model):
+class MonthlyClose(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
+    year = models.PositiveIntegerField()
+    month = models.PositiveIntegerField()
+    is_closed = models.BooleanField(default=True)
+    closed_at = models.DateTimeField(auto_now_add=True)
+    closed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='monthly_closures')
+
+    class Meta:
+        unique_together = ('institution', 'year', 'month')
+        ordering = ['-year', '-month']
+
+    def __str__(self):
+        import calendar
+        return f"{calendar.month_name[self.month]} {self.year} - {self.institution.name} ({'Cerrado' if self.is_closed else 'Abierto'})"
+
+class Account(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     ACCOUNT_TYPES = (
         ('ASSET', 'Activo'),
         ('LIABILITY', 'Pasivo'),
@@ -23,7 +41,6 @@ class Account(models.Model):
         ('EXPENSE', 'Gastos'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='accounts')
     code = models.CharField(max_length=50) # e.g. 1.1.01
     name = models.CharField(max_length=200)
     account_type = models.CharField(max_length=20, choices=ACCOUNT_TYPES)
@@ -52,19 +69,27 @@ class Account(models.Model):
             self.level = 1
         super().save(*args, **kwargs)
 
-class JournalEntry(models.Model):
+class JournalEntry(TenantModel):
     STATE_CHOICES = (
         ('DRAFT', 'Borrador'),
         ('POSTED', 'Asentado'),
         ('CANCELLED', 'Anulado'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='journal_entries')
+    ENTRY_TYPES = (
+        ('REGULAR', 'Regular'),
+        ('ADJUSTMENT', 'Ajuste de Integridad'),
+    )
+
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     date = models.DateField()
     description = models.TextField()
     reference = models.CharField(max_length=100, blank=True) # e.g. "Factura #001"
     
     state = models.CharField(max_length=20, choices=STATE_CHOICES, default='DRAFT')
+    entry_type = models.CharField(max_length=20, choices=ENTRY_TYPES, default='REGULAR')
+    is_unbalanced = models.BooleanField(default=False, help_text="Marcado automático para asientos que no cumplen el balance Debe == Haber.")
+    adjustment_for = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='adjustments', help_text="Enlace al asiento original que este registro está corrigiendo.")
     
     created_by = models.ForeignKey(User, on_delete=models.PROTECT)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -85,7 +110,8 @@ class JournalEntry(models.Model):
     def is_balanced(self):
         return self.total_debit == self.total_credit
 
-class JournalItem(models.Model):
+class JournalItem(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     journal_entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='items')
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
     
@@ -100,8 +126,12 @@ class JournalItem(models.Model):
     def clean(self):
         if self.debit > 0 and self.credit > 0:
              raise ValidationError("A journal item cannot have both debit and credit.")
+        
+        if self.journal_entry and self.institution != self.journal_entry.institution:
+             raise ValidationError(f"Multi-tenant Violation: JournalItem institution ({self.institution}) must match JournalEntry institution ({self.journal_entry.institution})")
 
-class AccountingConfig(models.Model):
+class AccountingConfig(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     KEYS = (
         ('ASSET_CASH', 'Activo - Caja (Efectivo)'),
         ('ASSET_BANK', 'Activo - Bancos (Transferencia)'),
@@ -111,9 +141,15 @@ class AccountingConfig(models.Model):
         ('LIABILITY_SUPPLIERS', 'Pasivo - Proveedores (Cuentas por Pagar)'),
         ('ASSET_TAX_CREDIT', 'Activo - IVA Crédito Tributario'),
         ('EQUITY_RETAINED_EARNINGS', 'Patrimonio - Resultados Acumulados / Utilidad del Ejercicio'),
+        ('EXPENSE_DISCOUNTS', 'Gastos - Descuentos Concedidos'),
+        ('EXPENSE_SALARIES', 'Gastos - Sueldos y Salarios'),
+        ('EXPENSE_BENEFITS', 'Gastos - Beneficios Sociales / Décimos'),
+        ('EXPENSE_SOCIAL_SECURITY', 'Gastos - Aporte Patronal IESS'),
+        ('LIABILITY_SALARIES_PAYABLE', 'Pasivo - Sueldos por Pagar'),
+        ('LIABILITY_IESS_PAYABLE', 'Pasivo - IESS por Pagar'),
+        ('LIABILITY_BENEFITS_PAYABLE', 'Pasivo - Beneficios Sociales por Pagar'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='accounting_configs')
     key = models.CharField(max_length=50, choices=KEYS)
     account = models.ForeignKey(Account, on_delete=models.CASCADE)
 
@@ -125,11 +161,11 @@ class AccountingConfig(models.Model):
     def __str__(self):
         return f"{self.institution.name} : {self.get_key_display()} -> {self.account.code}"
 
-class Bank(models.Model):
+class Bank(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Catálogo de Instituciones Financieras (Bancos, Cooperativas).
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='banks')
     name = models.CharField(max_length=150, verbose_name="Nombre del Banco")
     code = models.CharField(max_length=50, blank=True, verbose_name="Código (Opcional/SRI)")
     is_active = models.BooleanField(default=True)
@@ -144,7 +180,8 @@ class Bank(models.Model):
     def __str__(self):
         return self.name
 
-class BankAccount(models.Model):
+class BankAccount(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Cuentas bancarias operativas de la Institución.
     """
@@ -154,7 +191,6 @@ class BankAccount(models.Model):
         ('VIRTUAL', 'Billetera Virtual / Online'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='bank_accounts')
     bank = models.ForeignKey(Bank, on_delete=models.PROTECT, related_name='accounts', verbose_name="Banco")
     
     account_number = models.CharField(max_length=50, verbose_name="Número de Cuenta")
@@ -175,11 +211,11 @@ class BankAccount(models.Model):
     def __str__(self):
         return f"{self.bank.name} - {self.get_account_type_display()} {self.account_number}"
 
-class FixedAsset(models.Model):
+class FixedAsset(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Activos Fijos de la Institución.
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name='fixed_assets')
     name = models.CharField(max_length=200, verbose_name="Nombre del Activo")
     code = models.CharField(max_length=50, blank=True, verbose_name="Código Interno / Etiqueta")
     
@@ -212,7 +248,8 @@ class FixedAsset(models.Model):
         return Decimal(str(self.purchase_price)) - Decimal(str(self.accumulated_depreciation))
 
 
-class Depreciation(models.Model):
+class Depreciation(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Historial de Depreciaciones de un Activo Fijo.
     """

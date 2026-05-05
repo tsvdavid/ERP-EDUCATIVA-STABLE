@@ -19,35 +19,37 @@ from .serializers import (
     StudentRiskProfileSerializer, AlertRuleSerializer
 )
 
-STAFF_ROLES = ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'DECE', 'MEDICO', 'TEACHER']
-DECE_ROLES  = ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'DECE']
-ADMIN_ROLES = ['ADMIN', 'LOCAL_ADMIN', 'RECTOR']
+from users.permissions import IsAdminUser, IsLocalAdminUser, IsAcademicStaff, IsTreasuryStaff, IsHealthStaff
+from users.tenant_mixins import InstitutionFilterMixin
 
 
 # ─── FICHAS PERMANENTES ────────────────────────────────────────────────────────
 
-class MedicalRecordViewSet(viewsets.ModelViewSet):
+class MedicalRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = MedicalRecord.objects.all()
     serializer_class = MedicalRecordSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
+        qs = super().get_queryset()
         if user.role == 'STUDENT':
-            return MedicalRecord.objects.filter(student=user)
+            return qs.filter(student=user)
         if user.role == 'PARENT':
-            return MedicalRecord.objects.filter(student__in=user.children.all())
-        return MedicalRecord.objects.all()
+            return qs.filter(student__in=user.children.all())
+        return qs
 
 
-class MedicalVisitViewSet(viewsets.ModelViewSet):
+class MedicalVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = MedicalVisit.objects.all()
     serializer_class = MedicalVisitSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
-        qs = MedicalVisit.objects.all()
+        qs = super().get_queryset()
         if user.role == 'STUDENT':
             return qs.filter(student=user)
         if user.role == 'PARENT':
@@ -61,28 +63,31 @@ class MedicalVisitViewSet(viewsets.ModelViewSet):
         serializer.save(doctor=self.request.user)
 
 
-class DeceRecordViewSet(viewsets.ModelViewSet):
+class DeceRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = DeceRecord.objects.all()
     serializer_class = DeceRecordSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
+        qs = super().get_queryset()
         if user.role == 'STUDENT':
-            return DeceRecord.objects.filter(student=user)
+            return qs.filter(student=user)
         if user.role == 'PARENT':
-            return DeceRecord.objects.filter(student__in=user.children.all())
-        return DeceRecord.objects.all()
+            return qs.filter(student__in=user.children.all())
+        return qs
 
 
-class DeceVisitViewSet(viewsets.ModelViewSet):
+class DeceVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = DeceVisit.objects.all()
     serializer_class = DeceVisitSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
-        qs = DeceVisit.objects.all()
+        qs = super().get_queryset()
         if user.role == 'STUDENT':
             return qs.filter(student=user)
         if user.role == 'PARENT':
@@ -98,14 +103,15 @@ class DeceVisitViewSet(viewsets.ModelViewSet):
 
 # ─── REGISTROS CONDUCTUALES ───────────────────────────────────────────────────
 
-class BehaviorRecordViewSet(viewsets.ModelViewSet):
+class BehaviorRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = BehaviorRecord.objects.select_related('student', 'created_by', 'subject', 'course', 'academic_year')
     serializer_class = BehaviorRecordSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
-        qs = BehaviorRecord.objects.select_related('student', 'created_by', 'subject', 'course', 'academic_year')
+        qs = super().get_queryset()
 
         if user.role == 'STUDENT':
             qs = qs.filter(student=user)
@@ -195,9 +201,10 @@ class BehaviorRecordViewSet(viewsets.ModelViewSet):
 
 # ─── CASOS CONDUCTUALES ───────────────────────────────────────────────────────
 
-class BehaviorCaseViewSet(viewsets.ModelViewSet):
+class BehaviorCaseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = BehaviorCase.objects.select_related('student', 'assigned_to', 'created_by', 'academic_year')
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -206,14 +213,14 @@ class BehaviorCaseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = BehaviorCase.objects.select_related('student', 'assigned_to', 'created_by', 'academic_year')
+        qs = super().get_queryset()
 
         # Filtrar por área según rol
         if user.role == 'DECE':
             qs = qs.filter(area='DECE')
         elif user.role == 'MEDICO':
             qs = qs.filter(area='MEDICAL')
-        elif user.role not in ADMIN_ROLES:
+        elif not user.is_superuser and user.role not in ADMIN_ROLES:
             return qs.none()
 
         # Filtros opcionales
@@ -323,10 +330,11 @@ class BehaviorCaseViewSet(viewsets.ModelViewSet):
 
 # ─── SEGUIMIENTOS ─────────────────────────────────────────────────────────────
 
-class CaseFollowUpViewSet(viewsets.ModelViewSet):
+class CaseFollowUpViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = CaseFollowUp.objects.select_related('case', 'created_by')
     serializer_class = CaseFollowUpSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         qs = CaseFollowUp.objects.select_related('case', 'created_by')
@@ -346,16 +354,17 @@ class CaseFollowUpViewSet(viewsets.ModelViewSet):
 
 # ─── PERFILES DE RIESGO ───────────────────────────────────────────────────────
 
-class StudentRiskProfileViewSet(viewsets.ReadOnlyModelViewSet):
+class StudentRiskProfileViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StudentRiskProfile.objects.select_related('student', 'academic_year')
     serializer_class = StudentRiskProfileSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
         if user.role not in DECE_ROLES + ['MEDICO']:
             return StudentRiskProfile.objects.none()
-        qs = StudentRiskProfile.objects.select_related('student', 'academic_year')
+        qs = super().get_queryset()
         params = self.request.query_params
         if params.get('academic_year'):
             qs = qs.filter(academic_year_id=params['academic_year'])
@@ -461,20 +470,17 @@ class StudentRiskProfileViewSet(viewsets.ReadOnlyModelViewSet):
 
 # ─── REGLAS DE ALERTA ─────────────────────────────────────────────────────────
 
-class AlertRuleViewSet(viewsets.ModelViewSet):
+class AlertRuleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = AlertRule.objects.all()
     serializer_class = AlertRuleSerializer
     permission_classes = [IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
         if user.role not in ADMIN_ROLES + ['DECE']:
             return AlertRule.objects.none()
-        qs = AlertRule.objects.all()
-        institution = getattr(user, 'institution', None)
-        if institution:
-            qs = qs.filter(institution=institution)
-        return qs
+        return super().get_queryset()
 
     def perform_create(self, serializer):
         institution = getattr(self.request.user, 'institution', None)

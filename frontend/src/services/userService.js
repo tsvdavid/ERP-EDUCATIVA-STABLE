@@ -41,6 +41,10 @@ const userService = {
         }
         return [];
     },
+    getInstitutionById: async (id) => {
+        const response = await api.get(`/users/institutions/${id}/`);
+        return response.data;
+    },
     createInstitution: async (data) => {
         const response = await api.post('/users/institutions/', data);
         return response.data;
@@ -51,6 +55,10 @@ const userService = {
     },
     deleteInstitution: async (id) => {
         const response = await api.delete(`/users/institutions/${id}/`);
+        return response.data;
+    },
+    hardDeleteInstitution: async (id) => {
+        const response = await api.post(`/users/institutions/${id}/hard-delete/`);
         return response.data;
     }
 };

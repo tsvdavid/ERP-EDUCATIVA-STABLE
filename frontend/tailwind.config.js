@@ -8,33 +8,36 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Inter', 'sans-serif'],
+                display: ['Outfit', 'sans-serif'],
             },
             colors: {
                 primary: {
-                    DEFAULT: '#063e9b', // Eduka360 Core Blue
-                    50: '#edf4ff',
-                    100: '#dceaff',
-                    200: '#b5d3ff',
-                    300: '#83b4ff',
-                    400: '#4f8fff',
-                    500: '#2669fc',
-                    600: '#124bec',
-                    700: '#063e9b',
-                    800: '#053180',
-                    900: '#092c7b',
+                    DEFAULT: '#E11D48', // Eduka360 Rose/Red
+                    50: '#fff1f2',
+                    100: '#ffe4e6',
+                    200: '#fecdd3',
+                    300: '#fda4af',
+                    400: '#fb7185',
+                    500: '#f43f5e',
+                    600: '#e11d48',
+                    700: '#be123c',
+                    800: '#9f1239',
+                    900: '#881337',
+                    950: '#4c0519',
                 },
                 // Override indigo globally to match our brand
                 indigo: {
-                    50: '#edf4ff',
-                    100: '#dceaff',
-                    200: '#b5d3ff',
-                    300: '#83b4ff',
-                    400: '#4f8fff',
-                    500: '#2669fc',
-                    600: '#124bec',
-                    700: '#063e9b',
-                    800: '#053180',
-                    900: '#092c7b',
+                    50: '#fff1f2',
+                    100: '#ffe4e6',
+                    200: '#fecdd3',
+                    300: '#fda4af',
+                    400: '#fb7185',
+                    500: '#f43f5e',
+                    600: '#e11d48',
+                    700: '#be123c',
+                    800: '#9f1239',
+                    900: '#881337',
+                    950: '#4c0519',
                 },
                 accent: {
                     yellow: '#facc15', // Gold from Owl

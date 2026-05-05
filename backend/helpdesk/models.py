@@ -1,13 +1,14 @@
 from django.db import models
 from users.models import User, Institution
 from django.utils import timezone
+from core.models import TenantModel
 
-class ServiceCatalog(models.Model):
+class ServiceCatalog(TenantModel):
     """
     Catalog of services available for tickets.
     e.g. "Hardware Support", "Access Request", "Software Installation"
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='subcategories', verbose_name="Categoría Padre")
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
@@ -17,11 +18,11 @@ class ServiceCatalog(models.Model):
     def __str__(self):
         return self.name
 
-class Workflow(models.Model):
+class Workflow(TenantModel):
     """
     Defines the lifecycle of a ticket.
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     is_default = models.BooleanField(default=False)
@@ -29,7 +30,8 @@ class Workflow(models.Model):
     def __str__(self):
         return self.name
 
-class PassStep(models.Model):
+class PassStep(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Steps/Levels within a workflow.
     """
@@ -50,7 +52,8 @@ class PassStep(models.Model):
     def __str__(self):
         return f"{self.workflow.name} - Step {self.order}: {self.name}"
 
-class Ticket(models.Model):
+class Ticket(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     PRIORITY_CHOICES = (
         ('LOW', 'Baja'),
         ('MEDIUM', 'Media'),
@@ -67,7 +70,6 @@ class Ticket(models.Model):
         ('REOPENED', 'Reabierto'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, db_index=True)
     requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='requested_tickets', db_index=True)
     assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_tickets', db_index=True)
     
@@ -95,13 +97,15 @@ class Ticket(models.Model):
             self.due_date = timezone.now() + timezone.timedelta(hours=self.category.sla_hours)
         super().save(*args, **kwargs)
 
-class TicketSurvey(models.Model):
+class TicketSurvey(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     ticket = models.OneToOneField(Ticket, on_delete=models.CASCADE, related_name='survey')
     rating = models.PositiveIntegerField(choices=[(i, str(i)) for i in range(1, 6)])
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-class ScheduledJob(models.Model):
+class ScheduledJob(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     """
     Orchestrator for recurring tickets (Preventive Maintenance).
     """
@@ -111,7 +115,6 @@ class ScheduledJob(models.Model):
         ('MONTHLY', 'Mensual'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     frequency = models.CharField(max_length=20, choices=FREQUENCY_CHOICES)
     
@@ -128,7 +131,8 @@ class ScheduledJob(models.Model):
     def __str__(self):
         return f"Job: {self.name} ({self.frequency})"
 
-class TicketComment(models.Model):
+class TicketComment(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(User, on_delete=models.PROTECT)
     content = models.TextField()
@@ -137,7 +141,8 @@ class TicketComment(models.Model):
     def __str__(self):
         return f"Comment by {self.author} on #{self.ticket.id}"
 
-class TicketAttachment(models.Model):
+class TicketAttachment(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     ticket = models.ForeignKey(Ticket, on_delete=models.CASCADE, related_name='attachments')
     uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT)
     file = models.FileField(upload_to='helpdesk/attachments/')

@@ -124,7 +124,8 @@ class InstructorDashboardStatsView(APIView):
                 
                 active_year = AcademicYear.objects.filter(institution=user.institution, is_active=True).first()
                 if not active_year:
-                    active_year = AcademicYear.objects.filter(is_active=True).first() or AcademicYear.objects.order_by('-year').first()
+                    # HARDENING: Fallback limitado estrictamente a la institución del usuario
+                    active_year = AcademicYear.objects.filter(institution=user.institution).order_by('-year').first()
                 print(f"Año Lectivo Detectado: {active_year}")
             else:
                 print(f"Modo: DOCENTE ({user.username})")

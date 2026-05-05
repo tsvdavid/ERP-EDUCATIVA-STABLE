@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Account, FiscalYear, JournalEntry, JournalItem, Bank, BankAccount, FixedAsset, Depreciation
+from .models import Account, FiscalYear, MonthlyClose, JournalEntry, JournalItem, Bank, BankAccount, FixedAsset, Depreciation, AccountingConfig
 
 class AccountSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
@@ -37,15 +37,20 @@ class JournalEntrySerializer(serializers.ModelSerializer):
         read_only_fields = ['created_by', 'created_at', 'posted_at']
 
     def validate_date(self, value):
-        from .models import FiscalYear
+        from .models import FiscalYear, MonthlyClose
         request = self.context.get('request')
         if request and request.user.institution:
+            # 1. Verificar Cierre Anual
             try:
                 fiscal_year = FiscalYear.objects.get(institution=request.user.institution, year=value.year)
                 if fiscal_year.is_closed:
                     raise serializers.ValidationError(f"El año fiscal {value.year} está cerrado. No se pueden registrar asientos.")
             except FiscalYear.DoesNotExist:
                 pass
+            
+            # 2. Verificar Cierre Mensual
+            if MonthlyClose.objects.filter(institution=request.user.institution, year=value.year, month=value.month, is_closed=True).exists():
+                raise serializers.ValidationError(f"El mes {value.month}/{value.year} está cerrado contablemente. No se pueden registrar ni modificar asientos.")
         return value
 
     def create(self, validated_data):
@@ -106,3 +111,25 @@ class FixedAssetSerializer(serializers.ModelSerializer):
         model = FixedAsset
         fields = '__all__'
         read_only_fields = ['institution', 'created_at']
+class AccountingConfigSerializer(serializers.ModelSerializer):
+    account_code = serializers.ReadOnlyField(source='account.code')
+    account_name = serializers.ReadOnlyField(source='account.name')
+    key_display = serializers.CharField(source='get_key_display', read_only=True)
+
+    class Meta:
+        model = AccountingConfig
+        fields = '__all__'
+        read_only_fields = ['institution']
+
+class MonthlyCloseSerializer(serializers.ModelSerializer):
+    closed_by_name = serializers.ReadOnlyField(source='closed_by.username')
+    month_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MonthlyClose
+        fields = '__all__'
+        read_only_fields = ['institution', 'closed_at', 'closed_by']
+
+    def get_month_name(self, obj):
+        import calendar
+        return calendar.month_name[obj.month]

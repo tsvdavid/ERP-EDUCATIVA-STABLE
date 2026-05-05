@@ -23,23 +23,22 @@ from .serializers import (
     ClassScheduleSerializer,
     ObservationSerializer
 )
-from users.permissions import IsAdminOrLocalAdminUser, IsRectorUser, IsTeacherUser, IsAdminUser
+from users.permissions import IsAcademicStaff, IsAdminUser, IsLocalAdminUser, IsTreasuryStaff
 from users.models import User
+from users.tenant_mixins import InstitutionFilterMixin
 
 
-class AcademicYearViewSet(viewsets.ModelViewSet):
+class AcademicYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = AcademicYear.objects.all()
     serializer_class = AcademicYearSerializer
-    
-    def perform_create(self, serializer):
-        user = self.request.user
-        if not user.institution:
-             raise ValidationError({"institution": "El usuario no tiene una institución asignada."})
-        serializer.save(institution=user.institution)
+    tenant_field = 'institution'
 
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
+    
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy', 'set_active']:
-            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsLocalAdminUser | IsLocalAdminUser)()]
         return [permissions.IsAuthenticated()]
 
     @action(detail=True, methods=['post'])
@@ -56,37 +55,37 @@ class AcademicYearViewSet(viewsets.ModelViewSet):
         
         return Response({'status': 'Año lectivo activado exitosamente'})
 
-class AcademicPeriodViewSet(viewsets.ModelViewSet):
+class AcademicPeriodViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = AcademicPeriod.objects.all()
     serializer_class = AcademicPeriodSerializer
+    tenant_field = 'institution'
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsLocalAdminUser | IsLocalAdminUser)()]
         return [permissions.IsAuthenticated()]
 
-class CourseViewSet(viewsets.ModelViewSet):
-
+class CourseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Course.objects.all().select_related('institution')
     serializer_class = CourseSerializer
+    tenant_field = 'institution'
+
+    def perform_create(self, serializer):
+        serializer.save(institution=self.request.user.institution)
     
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAuthenticated(), (IsAdminOrLocalAdminUser | IsRectorUser)()]
+            return [permissions.IsAuthenticated(), (IsLocalAdminUser | IsLocalAdminUser)()]
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Course.objects.all()
         user = self.request.user
-        header_inst_id = self.request.headers.get('X-Institution-ID')
-
-        # Security: Enforce Institution
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-             queryset = queryset.filter(institution=user.institution)
-             if header_inst_id and str(header_inst_id) != str(user.institution.id):
-                 return queryset.none()
-        elif header_inst_id:
-             queryset = queryset.filter(institution_id=header_inst_id)
+        queryset = super().get_queryset()
+        
+        # Specific Role Filters
         
         if user.role == 'STUDENT':
              # Students only see courses they are enrolled in
@@ -105,8 +104,8 @@ class CourseViewSet(viewsets.ModelViewSet):
             target_inst_id = None
             if user.institution:
                 target_inst_id = user.institution.id
-            elif header_inst_id:
-                target_inst_id = header_inst_id
+            elif self.request.headers.get('X-Institution-ID'):
+                target_inst_id = self.request.headers.get('X-Institution-ID')
             
             if target_inst_id:
                 # Find active year for this institution
@@ -119,13 +118,20 @@ class CourseViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-class EvaluationCategoryViewSet(viewsets.ModelViewSet):
+class EvaluationCategoryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = EvaluationCategory.objects.all()
     serializer_class = EvaluationCategorySerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'subject__course__institution'
+    tenant_field = None # No direct institution field
+
+    def perform_create(self, serializer):
+        # Determine institution from related subject
+        subject = serializer.validated_data.get('subject')
+        serializer.save(institution=subject.course.institution)
 
     def get_queryset(self):
-        queryset = EvaluationCategory.objects.all()
+        queryset = super().get_queryset()
         subject_id = self.request.query_params.get('subject_id')
         if subject_id:
             queryset = queryset.filter(subject_id=subject_id)
@@ -136,30 +142,28 @@ class EvaluationCategoryViewSet(viewsets.ModelViewSet):
             
         return queryset
 
-class SubjectViewSet(viewsets.ModelViewSet):
+class SubjectViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Subject.objects.all().select_related('course', 'course__institution', 'teacher')
     serializer_class = SubjectSerializer
+    tenant_lookup = 'course__institution'
+    tenant_field = None
+
+    def perform_create(self, serializer):
+        # Determine institution from course
+        course = serializer.validated_data.get('course')
+        serializer.save(institution=course.institution)
     
     def get_permissions(self):
         # Teachers can update subjects (e.g. content), but not create/delete them (Academic Mgmt)
         if self.action in ['update', 'partial_update']:
-             return [permissions.IsAuthenticated(), (IsAdminUser | IsRectorUser)()]
+             return [permissions.IsAuthenticated(), (IsAdminUser | IsLocalAdminUser)()]
         if self.action in ['create', 'destroy']:
-             return [permissions.IsAuthenticated(), (IsAdminUser | IsRectorUser)()]
+             return [permissions.IsAuthenticated(), (IsAdminUser | IsLocalAdminUser)()]
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        queryset = Subject.objects.all()
+        queryset = super().get_queryset()
         user = self.request.user
-        header_inst_id = self.request.headers.get('X-Institution-ID')
-
-        # Security: Enforce Institution
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-             queryset = queryset.filter(course__institution=user.institution)
-             if header_inst_id and str(header_inst_id) != str(user.institution.id):
-                 return queryset.none()
-        elif header_inst_id:
-             queryset = queryset.filter(course__institution_id=header_inst_id)
         
         if user.role == 'TEACHER':
              queryset = queryset.filter(teacher=user)
@@ -169,12 +173,8 @@ class SubjectViewSet(viewsets.ModelViewSet):
         if year_param:
             queryset = queryset.filter(course__year=year_param)
         else:
-            # Determine institution
-            target_inst_id = None
-            if user.institution:
-                target_inst_id = user.institution.id
-            elif header_inst_id:
-                target_inst_id = header_inst_id
+            # Determine target institution ID from Mixin result or context
+            target_inst_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
             
             if target_inst_id:
                 try:
@@ -186,7 +186,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-class EnrollmentViewSet(viewsets.ModelViewSet):
+class EnrollmentViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     # Optimize for calculate_averages() and serializers
     queryset = Enrollment.objects.all().select_related(
         'student', 
@@ -199,26 +199,18 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     )
     serializer_class = EnrollmentSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'course__institution'
+    tenant_field = None
 
     def get_queryset(self):
-        queryset = self.queryset
+        queryset = super().get_queryset()
         user = self.request.user
-        header_inst_id = self.request.headers.get('X-Institution-ID')
-
-        # Security: Enforce Institution
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-             queryset = queryset.filter(course__institution=user.institution)
-             if header_inst_id and str(header_inst_id) != str(user.institution.id):
-                 return queryset.none()
-        elif header_inst_id:
-             queryset = queryset.filter(course__institution_id=header_inst_id)
             
         if user.role == 'STUDENT':
              return queryset.filter(student=user)
         
         if user.role == 'TEACHER':
              # Teachers see students enrolled in courses they teach
-             # Optimize: enrollment -> course -> subjects -> teacher = user
              return queryset.filter(course__subjects__teacher=user).distinct()
         
         # Filtering
@@ -235,12 +227,8 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         if year_param:
             queryset = queryset.filter(course__year=year_param)
         else:
-            # Determine institution
-            target_inst_id = None
-            if user.institution:
-                target_inst_id = user.institution.id
-            elif header_inst_id:
-                target_inst_id = header_inst_id
+            # Determine target institution
+            target_inst_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
             
             if target_inst_id:
                 try:
@@ -308,7 +296,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         
         if year_id:
             try:
-                ay = AcademicYear.objects.get(pk=year_id)
+                ay = AcademicYear.objects.get(pk=year_id, institution=user.institution)
                 queryset = queryset.filter(course__year=ay.year)
             except (AcademicYear.DoesNotExist, ValueError):
                 pass
@@ -379,7 +367,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         obs_filter = Q(student__institution_id=inst_id)
         if year_id:
             try:
-                ay = AcademicYear.objects.get(id=year_id)
+                ay = AcademicYear.objects.get(id=year_id, institution_id=inst_id)
                 obs_filter &= Q(student__enrollments__course__year=ay.year)
             except AcademicYear.DoesNotExist:
                 pass
@@ -399,7 +387,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         att_filter = Q(enrollment__course__institution_id=inst_id)
         if year_id:
             try:
-                ay = AcademicYear.objects.get(id=year_id)
+                ay = AcademicYear.objects.get(id=year_id, institution_id=inst_id)
                 att_filter &= Q(enrollment__course__year=ay.year)
             except AcademicYear.DoesNotExist:
                 pass
@@ -424,7 +412,10 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def download_report_card(self, request, pk=None):
-        # Optimization: Prefetch everything needed for averages
+        # SECURITY FIX: Use self.get_object() to ensure tenant isolation
+        enrollment = self.get_object()
+        
+        # Prefetch manually since we need deep optimization for PDF
         enrollment = Enrollment.objects.select_related(
             'course', 
             'course__institution', 
@@ -433,7 +424,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             'course__subjects',
             'course__subjects__evaluation_categories',
             'grades'
-        ).get(pk=pk)
+        ).get(pk=enrollment.pk)
         
         # Calculate fresh averages
         summary = enrollment.calculate_averages()
@@ -573,15 +564,15 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
                 
             return HttpResponse(f"Error generando PDF: {e}", status=500)
 
-class GradeViewSet(viewsets.ModelViewSet):
+class GradeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     serializer_class = GradeSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'enrollment__course__institution'
+    tenant_field = None
 
     def _check_low_grade_alert(self, grade):
         if grade.score < 7:
             from communication.models import Notification
-            # Check if recent notification already exists to avoid spamming (optional, but good practice)
-            # For this MVP, we just create it.
             Notification.objects.create(
                 user=grade.enrollment.student,
                 type=Notification.Type.ALERT,
@@ -592,31 +583,7 @@ class GradeViewSet(viewsets.ModelViewSet):
                 related_object_id=grade.id
             )
 
-    def perform_create(self, serializer):
-        try:
-            self._validate_year_period_open(serializer.validated_data)
-            grade = serializer.save()
-            self._check_low_grade_alert(grade)
-        except Exception as e:
-            with open("/var/www/erpeducativa/ERP-EDUCATIVA/backend/debug_grades.txt", "a") as f:
-                f.write(f"CREATE ERROR: {type(e).__name__}: {str(e)}\n")
-                f.write(traceback.format_exc() + "\n")
-            raise e
-
-    def perform_update(self, serializer):
-        try:
-            self._validate_year_period_open(serializer.validated_data)
-            grade = serializer.save()
-            self._check_low_grade_alert(grade)
-        except Exception as e:
-            with open("/var/www/erpeducativa/ERP-EDUCATIVA/backend/debug_grades.txt", "a") as f:
-                f.write(f"UPDATE ERROR: {type(e).__name__}: {str(e)}\n")
-                f.write(traceback.format_exc() + "\n")
-            raise e
-
     def _validate_year_period_open(self, validated_data):
-        # Allow specific roles to bypass? For now, stricty block modifications as requested.
-        
         # Get related context
         instance = None
         if self.action in ['update', 'partial_update']:
@@ -643,24 +610,28 @@ class GradeViewSet(viewsets.ModelViewSet):
 
         # Check Academic Period Status
         try:
-            # Handle hierarchical categories: use parent trimester if child doesn't have one
             trimester_num = category.trimester
-            
             if trimester_num is not None:
-                # We need to ensure acad_year is defined
                 acad_year = AcademicYear.objects.filter(year=year_val, institution_id=institution_id).first()
                 if acad_year:
                     period = acad_year.periods.get(number=trimester_num)
                     if period.is_closed:
                         raise ValidationError(_(f"El Trimestre {trimester_num} está cerrado. No se pueden modificar calificaciones."))
         except Exception:
-            # If any validation step fails (e.g. period not found), we allow the save 
-            # to avoid blocking the user due to configuration gaps.
             pass
 
+    def perform_create(self, serializer):
+        self._validate_year_period_open(serializer.validated_data)
+        grade = serializer.save()
+        self._check_low_grade_alert(grade)
+
+    def perform_update(self, serializer):
+        self._validate_year_period_open(serializer.validated_data)
+        grade = serializer.save()
+        self._check_low_grade_alert(grade)
 
     def get_queryset(self):
-        queryset = Grade.objects.all().select_related(
+        queryset = super().get_queryset().select_related(
             'enrollment', 
             'enrollment__student', 
             'subject', 
@@ -668,15 +639,6 @@ class GradeViewSet(viewsets.ModelViewSet):
             'enrollment__course'
         )
         user = self.request.user
-        header_inst_id = self.request.headers.get('X-Institution-ID')
-
-        # Security: Enforce Institution
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-             queryset = queryset.filter(enrollment__course__institution=user.institution)
-             if header_inst_id and str(header_inst_id) != str(user.institution.id):
-                 return queryset.none()
-        elif header_inst_id:
-             queryset = queryset.filter(enrollment__course__institution_id=header_inst_id)
 
         student_id = self.request.query_params.get('student_id')
         if student_id:
@@ -690,7 +652,7 @@ class GradeViewSet(viewsets.ModelViewSet):
         if course_id:
             queryset = queryset.filter(enrollment__course_id=course_id)
         
-        # Seurity: Parents/Students can only see their own data
+        # Security: Parents/Students can only see their own data
         if user.role == 'STUDENT':
             queryset = queryset.filter(enrollment__student=user)
         elif user.role == 'PARENT':
@@ -701,21 +663,10 @@ class GradeViewSet(viewsets.ModelViewSet):
         if year_param:
             queryset = queryset.filter(enrollment__course__year=year_param)
         else:
-            # Determine institution
-            target_inst_id = None
-            if user.institution:
-                target_inst_id = user.institution.id
-            elif header_inst_id:
-                target_inst_id = header_inst_id
-            
+            target_inst_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
             if target_inst_id:
                 try:
                     active_year = AcademicYear.objects.filter(institution_id=target_inst_id, is_active=True).first()
-                    # Only filter if active year exists. 
-                    # If we have a course_id or subject_id specific query, we might arguably SKIP this 
-                    # to avoid 404ing old data, but for "Clean Slate" we enforce it unless requested.
-                    # HOWEVER, preventing 404s on direct ID access might be nice?
-                    # For now, strict enforcement requires ?year=...
                     if active_year:
                         queryset = queryset.filter(enrollment__course__year=active_year.year)
                 except Exception:
@@ -815,22 +766,19 @@ class GradeViewSet(viewsets.ModelViewSet):
             "risk_students": sorted(risk_students, key=lambda x: x['score'])
         })
 
-class AttendanceViewSet(viewsets.ModelViewSet):
+class AttendanceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'enrollment__course__institution'
+    tenant_field = None
+
+    def perform_create(self, serializer):
+        enrollment = serializer.validated_data.get('enrollment')
+        serializer.save(institution=enrollment.course.institution)
 
     def get_queryset(self):
-        queryset = Attendance.objects.all().select_related('enrollment', 'enrollment__student')
+        queryset = super().get_queryset().select_related('enrollment', 'enrollment__student')
         user = self.request.user
-        header_inst_id = self.request.headers.get('X-Institution-ID')
-
-        # Security: Enforce Institution
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-             queryset = queryset.filter(enrollment__course__institution=user.institution)
-             if header_inst_id and str(header_inst_id) != str(user.institution.id):
-                 return queryset.none()
-        elif header_inst_id:
-             queryset = queryset.filter(enrollment__course__institution_id=header_inst_id)
 
         student_id = self.request.query_params.get('student_id')
         if student_id:
@@ -856,13 +804,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         if year_param:
             queryset = queryset.filter(enrollment__course__year=year_param)
         else:
-            # Determine institution
-            target_inst_id = None
-            if user.institution:
-                target_inst_id = user.institution.id
-            elif header_inst_id:
-                target_inst_id = header_inst_id
-            
+            target_inst_id = self.request.tenant.id if hasattr(self.request, 'tenant') and self.request.tenant else None
             if target_inst_id:
                 try:
                     active_year = AcademicYear.objects.filter(institution_id=target_inst_id, is_active=True).first()
@@ -971,10 +913,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             "global_attendance_pct": get_pct(present_count + late_count + excused_count)
         })
 
-class ClassScheduleViewSet(viewsets.ModelViewSet):
+class ClassScheduleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = ClassSchedule.objects.all()
     serializer_class = ClassScheduleSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'subject__course__institution'
+    tenant_field = None
+
+    def perform_create(self, serializer):
+        # Determine institution from subject
+        subject = serializer.validated_data.get('subject')
+        serializer.save(institution=subject.course.institution)
 
     def get_queryset(self):
         queryset = ClassSchedule.objects.all()
@@ -999,37 +948,26 @@ class ClassScheduleViewSet(viewsets.ModelViewSet):
         
         return queryset
 
-class ObservationViewSet(viewsets.ModelViewSet):
+class ObservationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Observation.objects.all().select_related('student', 'teacher')
     serializer_class = ObservationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
-        queryset = Observation.objects.all().select_related('student', 'teacher')
+        queryset = super().get_queryset().select_related('student', 'teacher')
         user = self.request.user
         
-        # 1. Base Institution Filter
-        if not user.is_superuser and user.role != 'ADMIN' and user.institution:
-            queryset = queryset.filter(student__institution=user.institution)
-
         # 2. Privacy Filtering
-        # Only certain roles can see private observations
         if user.role not in ['ADMIN', 'LOCAL_ADMIN', 'DECE', 'MEDICO']:
             queryset = queryset.filter(is_private=False)
 
         # 3. Role-specific Filtering
         if user.role == 'STUDENT':
-            # Students see their own non-private observations
             queryset = queryset.filter(student=user, is_private=False)
         elif user.role == 'PARENT':
-            # Parents see their children's non-private observations
             queryset = queryset.filter(student__in=user.children.all(), is_private=False)
         elif user.role == 'TEACHER':
-            # Teachers see observations for their courses or what they created
-            # but usually they can see all public observations of students they teach
-            # To simplify, we allow them to see all PUBLIC observations of students in their institution,
-            # or we can restrict to students in their subjects.
-            # Let's restrict to students in their subjects for better privacy.
             queryset = queryset.filter(
                 Q(student__enrollments__course__subjects__teacher=user) | 
                 Q(teacher=user)
@@ -1048,8 +986,11 @@ class ObservationViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        # Auto-set teacher to current user
-        observation = serializer.save(teacher=self.request.user)
+        # Auto-set teacher and institution to current context
+        observation = serializer.save(
+            teacher=self.request.user,
+            institution=self.request.user.institution
+        )
         
         # Automatic alert system for HIGH criticality or NEGATIVE types
         if observation.criticality == 'HIGH' or observation.type in ['BEHAVIORAL', 'SOCIOEMOTIONAL']:

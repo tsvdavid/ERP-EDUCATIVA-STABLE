@@ -24,3 +24,9 @@ openai
 pandas
 openpyxl
 reportlab
+signxml
+lxml
+cryptography
+pyOpenSSL
+zeep
+requests

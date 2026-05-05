@@ -12,14 +12,22 @@ from purchases.models import Supplier, PurchaseInvoice, PurchaseItem
 class Command(BaseCommand):
     help = 'Populates the database with comprehensive Accounting data (NIIF Ecuador)'
 
-    def handle(self, *args, **kwargs):
-        self.stdout.write(self.style.WARNING('Iniciando población de datos contables COMPLETA...'))
+    def add_arguments(self, parser):
+        parser.add_argument('--institution', type=int, help='ID of the institution to populate')
+
+    def handle(self, *args, **options):
+        institution_id = options.get('institution')
+        self.stdout.write(self.style.WARNING(f'Iniciando población de datos contables para institución {institution_id or "FIRST"}...'))
 
         with transaction.atomic():
             # 0. Get Institution
-            institution = Institution.objects.first()
+            if institution_id:
+                institution = Institution.objects.get(id=institution_id)
+            else:
+                institution = Institution.objects.first()
+                
             if not institution:
-                self.stdout.write(self.style.ERROR('No existe institución. Ejecute populate_test_data primero.'))
+                self.stdout.write(self.style.ERROR('No existe la institución especificada.'))
                 return
 
             # Clear existing accounting data to avoid duplicates/conflicts if re-running
@@ -275,18 +283,18 @@ class Command(BaseCommand):
             # Equipos: 8.000
             # Edificios: 120.000
             # Terreno: 50.000
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.1.01.01'], debit=2000)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.1.01.10.01'], debit=15000) 
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.2.01.03'], debit=12000)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.2.01.05'], debit=8000)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.2.01.02'], debit=120000)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['1.2.01.01'], debit=50000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.1.01.01'], debit=2000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.1.01.10.01'], debit=15000) 
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.2.01.03'], debit=12000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.2.01.05'], debit=8000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.2.01.02'], debit=120000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['1.2.01.01'], debit=50000)
 
             # HABER (Pasivos + Patrimonio)
             # Préstamo Bancario LP: 60.000
             # Capital Social: 147.000 (Diferencia)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['2.2.01'], credit=60000)
-            JournalItem.objects.create(journal_entry=entry, account=acc_cache['3.1.01'], credit=147000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['2.2.01'], credit=60000)
+            JournalItem.objects.create(institution=institution, journal_entry=entry, account=acc_cache['3.1.01'], credit=147000)
             
             self.stdout.write(self.style.SUCCESS('Asiento de apertura creado y balanceado ($207,000).'))
 

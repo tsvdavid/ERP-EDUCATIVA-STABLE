@@ -1,8 +1,9 @@
 from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+from core.models import TenantModel
 
-class Transaction(models.Model):
+class Transaction(TenantModel):
     class Status(models.TextChoices):
         PENDING = 'PENDING', _('Pendiente')
         VERIFYING = 'VERIFYING', _('En Verificación')
@@ -12,6 +13,7 @@ class Transaction(models.Model):
         REFUNDED = 'REFUNDED', _('Reembolsado')
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, related_name='transactions', verbose_name=_("Institución"))
     amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Monto a cobrar")
     currency = models.CharField(max_length=3, default='USD', help_text="Moneda (ej USD)")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
@@ -54,8 +56,8 @@ class PaymentLog(models.Model):
     def __str__(self):
         return f"{self.gateway_name} - {self.event_type} - {self.created_at}"
 
-class PaymentGatewayConfig(models.Model):
-    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, related_name='payment_gateways')
+class PaymentGatewayConfig(TenantModel):
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, related_name='payment_gateways', verbose_name=_("Institución"))
     gateway_name = models.CharField(max_length=50, help_text="Ej: stripe, paypal, mercadopago, payphone")
     
     is_active = models.BooleanField(default=False, help_text="¿Está habilitada esta pasarela para la institución?")
@@ -72,4 +74,4 @@ class PaymentGatewayConfig(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.gateway_name} ({'Activa' if self.is_active else 'Inactiva'}) - {self.institution.name}"
+        return f"{self.gateway_name} ({'Activa' if self.is_active else 'Inactiva'}) - {self.institution.name if self.institution else 'Global'}"

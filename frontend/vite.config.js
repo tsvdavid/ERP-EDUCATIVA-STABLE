@@ -14,11 +14,10 @@ export default defineConfig({
     host: true,
     port: 5173,
     strictPort: true,
-    // Add HMR config for Cloudflare Tunnels (prevents blank screens from wss crashes)
     hmr: {
       protocol: 'wss',
-      clientPort: 443, // Force WSS over 443 for HTTPS tunnels
-      path: 'vite-hmr' // Avoid conflict with Django channels
+      clientPort: 443,
+      host: 'eduka360.tecnoval.com.ec'
     },
     proxy: {
       '/api': {

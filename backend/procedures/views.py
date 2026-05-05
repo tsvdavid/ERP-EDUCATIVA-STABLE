@@ -5,6 +5,7 @@ from django.utils import timezone
 from .models import ProcedureTemplate, StudentRequest
 from .serializers import ProcedureTemplateSerializer, StudentRequestSerializer, StudentRequestActionSerializer
 from django.db import transaction
+from users.tenant_mixins import InstitutionFilterMixin
 
 import io
 from reportlab.pdfgen import canvas
@@ -13,26 +14,25 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from django.core.files.base import ContentFile
 
-class ProcedureTemplateViewSet(viewsets.ModelViewSet):
+class ProcedureTemplateViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = ProcedureTemplate.objects.all()
     serializer_class = ProcedureTemplateSerializer
-    permission_classes = [permissions.IsAuthenticated] # Needs custom for writers vs readers
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
     
     def get_queryset(self):
-        user = self.request.user
-        qs = ProcedureTemplate.objects.filter(institution=user.institution, is_active=True)
-        return qs
-        
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+        return super().get_queryset().filter(is_active=True)
 
 
-class StudentRequestViewSet(viewsets.ModelViewSet):
+class StudentRequestViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = StudentRequest.objects.all()
     serializer_class = StudentRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
     
     def get_queryset(self):
         user = self.request.user
-        qs = StudentRequest.objects.filter(institution=user.institution).order_by('-request_date')
+        qs = super().get_queryset().order_by('-request_date')
         
         # Students see only theirs
         if user.role == 'STUDENT':
@@ -42,12 +42,10 @@ class StudentRequestViewSet(viewsets.ModelViewSet):
             children_ids = user.children.values_list('id', flat=True)
             return qs.filter(student__id__in=children_ids)
             
-        # Teachers and Admins can see requests assigned to their role
         return qs
 
     def perform_create(self, serializer):
         serializer.save(
-            institution=self.request.user.institution,
             student=self.request.user  # The student making the request
         )
 

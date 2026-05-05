@@ -1,13 +1,14 @@
 from django.db import models
 from users.models import User, Institution
+from core.models import TenantModel
 from django.utils import timezone
 
-class PolicyVersion(models.Model):
+class PolicyVersion(TenantModel):
     """
     Versions of Privacy Policies.
     Supports granular consent (e.g., separating Marketing from Essential Terms).
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     name = models.CharField(max_length=100) # e.g. "Términos y Condiciones", "Política de Cookies"
     version = models.CharField(max_length=20) # e.g. "1.0", "2.1"
     content = models.TextField()
@@ -18,10 +19,11 @@ class PolicyVersion(models.Model):
     def __str__(self):
         return f"{self.name} v{self.version}"
 
-class ConsentRecord(models.Model):
+class ConsentRecord(TenantModel):
     """
     Immutable record of user consent.
     """
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='consents')
     policy = models.ForeignKey(PolicyVersion, on_delete=models.PROTECT)
     accepted = models.BooleanField(default=True)
@@ -36,12 +38,12 @@ class ConsentRecord(models.Model):
         status = "Accepted" if self.accepted else "Rejected"
         return f"{self.user.username} - {self.policy} - {status}"
 
-class TreatmentActivity(models.Model):
+class TreatmentActivity(TenantModel):
     """
     Registro de Actividades de Tratamiento (RAT).
     Inventory of personal data processing activities.
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     name = models.CharField(max_length=200) # e.g. "Gestión de Nómina"
     purpose = models.TextField() # Finalidad
     legal_basis = models.CharField(max_length=100) # Base de Legitimación
@@ -51,7 +53,7 @@ class TreatmentActivity(models.Model):
     def __str__(self):
         return self.name
 
-class ARCORequest(models.Model):
+class ARCORequest(TenantModel):
     """
     Solicitudes de Derechos ARCO (Acceso, Rectificación, Cancelación, Oposición).
     """
@@ -71,7 +73,7 @@ class ARCORequest(models.Model):
         ('EXECUTED', 'Ejecutado'),
     )
 
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, db_index=True)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     requester = models.ForeignKey(User, on_delete=models.CASCADE, db_index=True)
     right_type = models.CharField(max_length=20, choices=RIGHT_CHOICES)
     details = models.TextField()
@@ -95,11 +97,11 @@ class ARCORequest(models.Model):
     def __str__(self):
         return f"{self.get_right_type_display()} - {self.requester.username}"
 
-class DataBreach(models.Model):
+class DataBreach(TenantModel):
     """
     Registro de Incidentes de Seguridad.
     """
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE)
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, null=False, related_name="%(class)s_related")
     title = models.CharField(max_length=200)
     description = models.TextField()
     detected_at = models.DateTimeField()

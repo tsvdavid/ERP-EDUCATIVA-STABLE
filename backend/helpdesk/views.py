@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from .models import ServiceCatalog, Ticket, Workflow, TicketSurvey, TicketCategory, TicketComment, TicketAttachment, SLA, CannedResponse
+from .models import ServiceCatalog, Ticket, Workflow, TicketSurvey, TicketComment, TicketAttachment
 from users.models import Institution, User
 from rest_framework.exceptions import ValidationError
 from .serializers import (
@@ -11,57 +11,53 @@ from .serializers import (
     TicketSerializer,
     WorkflowSerializer,
     TicketSurveySerializer,
-    TicketCategorySerializer, TicketCommentSerializer,
-    TicketAttachmentSerializer, SLASerializer, CannedResponseSerializer
+    TicketCommentSerializer,
+    TicketAttachmentSerializer
 )
-from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser
-from reportlab.lib.pagesizes import letter
+from users.permissions import IsAdminUser, IsLocalAdminUser, IsAcademicStaff, IsTreasuryStaff, IsHealthStaff
+from users.tenant_mixins import InstitutionFilterMixin
+import reportlab
 
-class ServiceCatalogViewSet(viewsets.ModelViewSet):
+class ServiceCatalogViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = ServiceCatalog.objects.filter(is_active=True)
     serializer_class = ServiceCatalogSerializer
+    tenant_field = 'institution'
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdminOrLocalAdminUser()]
+            return [IsLocalAdminUser()]
         return [permissions.IsAuthenticated()]
 
     def perform_create(self, serializer):
         inst = self.request.user.institution
         if not inst:
-            # Fallback for superusers without institution: grab the first one
-            if self.request.user.is_superuser:
-                inst = Institution.objects.first()
-
-            if not inst:
-                raise ValidationError({"institution": "User must belong to an institution to create catalog items."})
+            # BLOQUEO: Eliminado fallback Institution.objects.first() para superusers.
+            # Los superusers deben usar el header X-Institution-ID si no tienen inst vinculada.
+            raise ValidationError({"institution": "Debe pertenecer a una institución o especificar una para crear ítems de catálogo."})
 
         serializer.save(institution=inst)
 
-class TicketViewSet(viewsets.ModelViewSet):
+class TicketViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     serializer_class = TicketSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
         # Optimize query with select_related
-        qs = Ticket.objects.select_related('requester', 'assigned_to', 'category', 'institution', 'current_step')
+        qs = super().get_queryset().select_related('requester', 'assigned_to', 'category', 'institution', 'current_step')
 
         # If admin/staff (Agent), see all or assigned. If student/teacher, only requested.
         if user.role in ['ADMIN', 'RECTOR', 'SECRETARY'] or user.is_superuser:
-            if user.is_superuser and not user.institution:
-                return qs.all()
-            return qs.filter(institution=user.institution)
+            return qs
         else:
             return qs.filter(requester=user)
 
     def perform_create(self, serializer):
         inst = self.request.user.institution
         if not inst:
-            if self.request.user.is_superuser:
-                inst = Institution.objects.first()
-            if not inst:
-                raise ValidationError({"institution": "User must belong to an institution."})
+             # BLOQUEO: Eliminado fallback Institution.objects.first()
+             raise ValidationError({"institution": "Debe pertenecer a una institución para crear tickets."})
                 
         serializer.save(institution=inst, requester=self.request.user)
 
@@ -107,9 +103,10 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.save()
         return Response({'status': 'Ticket asignado exitosamente', 'assigned_to': user.id})
 
-class WorkflowViewSet(viewsets.ModelViewSet):
+class WorkflowViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     serializer_class = WorkflowSerializer
     permission_classes = [permissions.IsAdminUser]
+    tenant_field = 'institution'
     
     def get_queryset(self):
-        return Workflow.objects.filter(institution=self.request.user.institution)
+        return super().get_queryset()

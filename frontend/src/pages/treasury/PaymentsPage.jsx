@@ -7,8 +7,8 @@ import userService from '../../services/userService';
 const PaymentsPage = () => {
     // Search State
     const [searchTerm, setSearchTerm] = useState('');
-    const [students, setStudents] = useState([]);
-    const [selectedStudent, setSelectedStudent] = useState(null);
+    const [customers, setCustomers] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [searching, setSearching] = useState(false);
 
     // Cart State
@@ -53,17 +53,10 @@ const PaymentsPage = () => {
         if (!searchTerm) return;
         setSearching(true);
         try {
-            const allUsers = await userService.getUsers();
-            // Filter by role STUDENT and name matches
             const lower = searchTerm.toLowerCase();
-            const found = allUsers.filter(u =>
-                u.role === 'STUDENT' &&
-                (u.first_name.toLowerCase().includes(lower) ||
-                    u.last_name.toLowerCase().includes(lower) ||
-                    u.cedula?.includes(lower))
-            );
-            setStudents(found);
-            if (found.length === 0) toast('No se encontraron estudiantes', { icon: '🔍' });
+            const found = await treasuryService.getCustomers({ search: lower });
+            setCustomers(found);
+            if (found.length === 0) toast('No se encontraron clientes', { icon: '🔍' });
         } catch (error) {
             toast.error("Error buscando");
         } finally {
@@ -71,61 +64,41 @@ const PaymentsPage = () => {
         }
     };
 
-    const selectStudent = async (student) => {
-        setSelectedStudent(student);
-        setStudents([]); // Clear search results
+    const selectStudent = async (customer) => {
+        setSelectedCustomer(customer);
+        setCustomers([]); // Clear search results
         setSearchTerm('');
         setCart([]); // Reset cart
         setLastInvoice(null);
         setStudentInvoices([]);
+        
+        // Cargar Datos de Facturación por defecto
         setBillingInfo({
-            client_name: '',
-            client_ruc: '',
-            client_address: '',
-            client_email: ''
+            client_name: customer.business_name || `${customer.first_name} ${customer.last_name}`,
+            client_ruc: customer.identification,
+            client_address: customer.address || 'Sin dirección',
+            client_email: customer.email || ''
         });
 
-        // Load Charges
-        try {
-            const pendingCharges = await treasuryService.getCharges({ student_id: student.id, pending: 'true' });
-            setCharges(pendingCharges);
-        } catch (error) {
-            console.error(error);
-            toast.error("Error cargando deudas del estudiante");
+        // Load Charges (Solo si es estudiante)
+        if (customer.student) {
+            try {
+                const pendingCharges = await treasuryService.getCharges({ student_id: customer.student, pending: 'true' });
+                setCharges(pendingCharges);
+            } catch (error) {
+                console.error(error);
+                toast.error("Error cargando deudas del estudiante");
+            }
+        } else {
+            setCharges([]);
         }
 
-        // Load Invoices & Last Invoice Info
+        // Load Invoices
         try {
-            const invoices = await treasuryService.getInvoices({ student_id: student.id });
+            const invoices = await treasuryService.getInvoices({ customer_id: customer.id });
             setStudentInvoices(invoices || []);
-
-            if (invoices && invoices.length > 0) {
-                // Assuming backend orders by -id, index 0 is latest
-                const last = invoices[0];
-                setBillingInfo({
-                    client_name: last.client_name || `${student.first_name} ${student.last_name}`,
-                    client_ruc: last.client_ruc || student.cedula || '9999999999999',
-                    client_address: last.client_address || student.address || 'Sin dirección',
-                    client_email: last.client_email || student.email || ''
-                });
-            } else {
-                // Fallback to student profile
-                setBillingInfo({
-                    client_name: `${student.first_name} ${student.last_name}`,
-                    client_ruc: student.cedula || '9999999999999',
-                    client_address: student.address || 'Sin dirección',
-                    client_email: student.email || ''
-                });
-            }
         } catch (error) {
-            console.error("Could not load last invoice info", error);
-            // Fallback to student profile
-            setBillingInfo({
-                client_name: `${student.first_name} ${student.last_name}`,
-                client_ruc: student.cedula || '9999999999999',
-                client_address: student.address || 'Sin dirección',
-                client_email: student.email || ''
-            });
+            console.error("Could not load invoices", error);
         }
     };
 
@@ -139,8 +112,8 @@ const PaymentsPage = () => {
                 toast.error(`Estado: ${result.status}. ${result.message}`, { id: toastId, duration: 5000 });
             }
             // Refresh invoices
-            if (selectedStudent) {
-                const invoices = await treasuryService.getInvoices({ student_id: selectedStudent.id });
+            if (selectedCustomer) {
+                const invoices = await treasuryService.getInvoices({ customer_id: selectedCustomer.id });
                 setStudentInvoices(invoices || []);
             }
         } catch (error) {
@@ -215,7 +188,7 @@ const PaymentsPage = () => {
             const isPending = selectedMethod === 'PENDING';
 
             const payload = {
-                student_id: selectedStudent.id,
+                customer_id: selectedCustomer.id,
                 payment_method_id: isPending ? null : selectedMethod,
                 is_pending: isPending,
                 client_name: billingInfo.client_name,
@@ -231,11 +204,12 @@ const PaymentsPage = () => {
 
             const invoice = await treasuryService.processPayment(payload);
             setLastInvoice(invoice);
-            toast.success(isPending ? "Factura creada con saldo pendiente" : "Cobro registrado exitosamente");
             setCart([]);
             // Reload Pending Charges (some might be paid or added now)
-            const pendingCharges = await treasuryService.getCharges({ student_id: selectedStudent.id, pending: 'true' });
-            setCharges(pendingCharges);
+            if (selectedCustomer.student) {
+                const pendingCharges = await treasuryService.getCharges({ student_id: selectedCustomer.student, pending: 'true' });
+                setCharges(pendingCharges);
+            }
         } catch (error) {
             console.error(error);
             toast.error("Error al procesar pago");
@@ -272,16 +246,16 @@ const PaymentsPage = () => {
                     {/* Student Search */}
                     <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                         <h2 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                            <User size={20} /> 1. Seleccionar Estudiante
+                            <User size={20} /> 1. Seleccionar Cliente
                         </h2>
 
-                        {!selectedStudent ? (
+                        {!selectedCustomer ? (
                             <form onSubmit={handleSearch} className="relative">
                                 <Search className="absolute left-3 top-3 text-slate-400" size={20} />
                                 <input
                                     type="text"
                                     className="input-modern pl-10 w-full"
-                                    placeholder="Buscar por nombre o cédula..."
+                                    placeholder="Buscar por nombre, cédula o RUC..."
                                     value={searchTerm}
                                     onChange={e => setSearchTerm(e.target.value)}
                                 />
@@ -289,15 +263,18 @@ const PaymentsPage = () => {
                                     {searching ? '...' : 'Buscar'}
                                 </button>
 
-                                {students.length > 0 && (
+                                {customers.length > 0 && (
                                     <ul className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg mt-1 shadow-xl max-h-60 overflow-y-auto">
-                                        {students.map(s => (
-                                            <li key={s.id}
-                                                onClick={() => selectStudent(s)}
+                                        {customers.map(c => (
+                                            <li key={c.id}
+                                                onClick={() => selectStudent(c)}
                                                 className="p-3 hover:bg-indigo-50 cursor-pointer border-b border-slate-50 last:border-0"
                                             >
-                                                <div className="font-bold text-slate-800">{s.first_name} {s.last_name}</div>
-                                                <div className="text-xs text-slate-500">CI: {s.cedula}</div>
+                                                <div className="font-bold text-slate-800">
+                                                    {c.customer_type === 'INDEPENDENT' && c.business_name ? c.business_name : `${c.first_name} ${c.last_name}`}
+                                                    {c.customer_type === 'INDEPENDENT' && <span className="ml-2 text-[10px] bg-slate-100 text-slate-500 px-1 rounded">EXTERNO</span>}
+                                                </div>
+                                                <div className="text-xs text-slate-500">ID: {c.identification}</div>
                                             </li>
                                         ))}
                                     </ul>
@@ -306,11 +283,13 @@ const PaymentsPage = () => {
                         ) : (
                             <div className="flex justify-between items-center bg-indigo-50 p-4 rounded-lg border border-indigo-100">
                                 <div>
-                                    <p className="text-sm text-indigo-600 font-bold uppercase">Estudiante Seleccionado</p>
-                                    <p className="text-lg font-bold text-slate-800">{selectedStudent.first_name} {selectedStudent.last_name}</p>
-                                    <p className="text-sm text-slate-500">{selectedStudent.cedula}</p>
+                                    <p className="text-sm text-indigo-600 font-bold uppercase">Cliente Seleccionado</p>
+                                    <p className="text-lg font-bold text-slate-800">
+                                        {selectedCustomer.customer_type === 'INDEPENDENT' && selectedCustomer.business_name ? selectedCustomer.business_name : `${selectedCustomer.first_name} ${selectedCustomer.last_name}`}
+                                    </p>
+                                    <p className="text-sm text-slate-500">{selectedCustomer.identification}</p>
                                 </div>
-                                <button onClick={() => setSelectedStudent(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
+                                <button onClick={() => setSelectedCustomer(null)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline">
                                     Cambiar
                                 </button>
                             </div>
@@ -318,13 +297,13 @@ const PaymentsPage = () => {
                     </div>
 
                     {/* Debts Section */}
-                    {selectedStudent && (
+                    {selectedCustomer && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <h2 className="font-bold text-slate-700 mb-4 flex items-center gap-2 text-red-600">
                                 <AlertCircle size={20} /> Deudas Pendientes ({charges.length})
                             </h2>
                             {charges.length === 0 ? (
-                                <p className="text-slate-400 italic">El estudiante está al día.</p>
+                                <p className="text-slate-400 italic">No hay deudas pendientes.</p>
                             ) : (
                                 <div className="space-y-3">
                                     {charges.map(charge => (
@@ -350,7 +329,7 @@ const PaymentsPage = () => {
                     )}
 
                     {/* Concepts Grid */}
-                    {selectedStudent && (
+                    {selectedCustomer && (
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                             <h2 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                                 <ShoppingCart size={20} /> 2. Servicios Adicionales
@@ -481,7 +460,7 @@ const PaymentsPage = () => {
             {lastInvoice && (
                 <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-8 text-center relative animate-in zoom-in-95">
-                        <button onClick={() => { setLastInvoice(null); loadResources(); if (selectedStudent) selectStudent(selectedStudent); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                        <button onClick={() => { setLastInvoice(null); loadResources(); if (selectedCustomer) selectStudent(selectedCustomer); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                             <X size={24} />
                         </button>
 
@@ -515,7 +494,7 @@ const PaymentsPage = () => {
                                     <Send size={18} /> Enviar SRI
                                 </button>
                             </div>
-                            <button onClick={() => { setLastInvoice(null); loadResources(); if (selectedStudent) selectStudent(selectedStudent); }} className="btn-secondary w-full">
+                            <button onClick={() => { setLastInvoice(null); loadResources(); if (selectedCustomer) selectStudent(selectedCustomer); }} className="btn-secondary w-full">
                                 Cerrar
                             </button>
                         </div>
@@ -524,7 +503,7 @@ const PaymentsPage = () => {
             )}
 
             {/* INVOICE HISTORY SECTION */}
-            {selectedStudent && studentInvoices.length > 0 && (
+            {selectedCustomer && studentInvoices.length > 0 && (
                 <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-slate-200 mt-6">
                     <h2 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
                         <FileText size={20} /> Historial de Facturas (Últimas 10)

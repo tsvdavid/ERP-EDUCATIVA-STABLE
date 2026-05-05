@@ -1,14 +1,15 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from core.models import TenantModel
 
-class AIProviderConfig(models.Model):
+class AIProviderConfig(TenantModel):
     PROVIDER_CHOICES = [
         ('anthropic', 'Anthropic (Claude)'),
         ('openai', 'OpenAI (GPT)'),
         ('local', 'Local / Custom (Ollama/vLLM)'),
     ]
 
-    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, related_name='ai_configs')
+    institution = models.ForeignKey('users.Institution', on_delete=models.CASCADE, related_name='ai_configs', verbose_name=_("Institución"))
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='anthropic')
     api_key = models.CharField(max_length=255, help_text=_("Clave API para el proveedor seleccionado"))
     model_name = models.CharField(max_length=100, default='claude-3-haiku-20240307', help_text=_("Nombre exacto del modelo (ej: gpt-4o, claude-3-opus)"))

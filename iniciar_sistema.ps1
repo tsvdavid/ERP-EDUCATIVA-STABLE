@@ -47,3 +47,5 @@ Write-Host "================================================" -ForegroundColor G
 Write-Host "Backend:  http://localhost:8000"
 Write-Host "Frontend: http://localhost:5173"
 Write-Host "Admin:    http://localhost:8000/admin"
+
+

@@ -8,7 +8,7 @@ from .serializers import (
     MessageSerializer, NotificationSerializer, 
     NoticeSerializer, HolidaySerializer
 )
-from users.permissions import IsAdminOrLocalAdminUser, IsTeacherUser, IsRectorUser
+from users.permissions import IsAdminUser, IsLocalAdminUser, IsAcademicStaff, IsTreasuryStaff
 
 class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
@@ -214,13 +214,13 @@ class HolidayViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
              return [permissions.IsAuthenticated()]
-        return [IsAdminOrLocalAdminUser()] # Changed from permissions.IsAdminUser()
+        return [IsLocalAdminUser()] # Changed from permissions.IsAdminUser()
     
     def get_queryset(self):
          # Allow all authenticated users to view
          return Holiday.objects.all().order_by('date')
 
-    @action(detail=False, methods=['post'], permission_classes=[IsAdminOrLocalAdminUser]) # Changed from permissions.IsAdminUser
+    @action(detail=False, methods=['post'], permission_classes=[IsLocalAdminUser]) # Changed from permissions.IsAdminUser
     def populate_holidays(self, request):
         """Populate holidays for Ecuador for a given year (defaults to current)"""
         import holidays

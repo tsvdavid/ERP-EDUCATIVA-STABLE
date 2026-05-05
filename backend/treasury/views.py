@@ -2,57 +2,97 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponse
 from io import BytesIO
+import logging
 import datetime
+from .tasks import process_invoice_sri
 
-from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge, CreditNote, DebitNote
+logger = logging.getLogger(__name__)
+
 from .serializers import (
     PaymentConceptSerializer, PaymentMethodSerializer, 
     InvoiceSerializer, CreateInvoiceSerializer, StudentAccountSerializer, ChargeSerializer,
-    CreditNoteSerializer, DebitNoteSerializer
+    CreditNoteSerializer, DebitNoteSerializer, CustomerSerializer, EmailLogSerializer
 )
+from notifications.models import EmailLog
+from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payment, StudentAccount, Charge, CreditNote, DebitNote, Customer
 from users.models import User, Institution
+from users.tenant_mixins import InstitutionFilterMixin
+from users.permissions import IsTreasuryStaff
 
-class PaymentConceptViewSet(viewsets.ModelViewSet):
+class PaymentConceptViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = PaymentConcept.objects.filter(is_active=True)
     serializer_class = PaymentConceptSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsTreasuryStaff]
+    tenant_field = 'institution'
 
     def perform_destroy(self, instance):
         instance.is_active = False
         instance.save()
 
-class PaymentMethodViewSet(viewsets.ReadOnlyModelViewSet):
+class PaymentMethodViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSet):
     queryset = PaymentMethod.objects.filter(is_active=True)
     serializer_class = PaymentMethodSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
-class StudentAccountViewSet(viewsets.ReadOnlyModelViewSet):
+class StudentAccountViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSet):
     queryset = StudentAccount.objects.all().select_related('student', 'student__institution')
     serializer_class = StudentAccountSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
 
     def get_queryset(self):
         user = self.request.user
+        qs = super().get_queryset()
         if user.role == 'STUDENT':
-            return StudentAccount.objects.filter(student=user).select_related('student', 'student__institution')
+            return qs.filter(student=user).select_related('student', 'student__institution')
         elif user.role == 'PARENT':
             # Accounts of children
             children_ids = user.children.values_list('id', flat=True)
-            return StudentAccount.objects.filter(student__id__in=children_ids).select_related('student', 'student__institution')
-        return super().get_queryset()
+            return qs.filter(student__id__in=children_ids).select_related('student', 'student__institution')
+        return qs
 
-class ChargeViewSet(viewsets.ModelViewSet):
+class CustomerViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = Customer.objects.all()
+    serializer_class = CustomerSerializer
+    permission_classes = [IsTreasuryStaff]
+    tenant_field = 'institution'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        identification = self.request.query_params.get('identification')
+        if identification:
+            qs = qs.filter(identification=identification)
+        
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(first_name__icontains=search) | 
+                Q(last_name__icontains=search) | 
+                Q(identification__icontains=search) |
+                Q(business_name__icontains=search)
+            )
+        return qs
+
+class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Charge.objects.all().select_related('student', 'concept', 'institution')
     serializer_class = ChargeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'generate_monthly']:
+            return [IsTreasuryStaff()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         # Base optimization
-        queryset = Charge.objects.all().select_related('student', 'concept', 'institution')
         user = self.request.user
+        queryset = super().get_queryset()
         
         # Security
         if user.role == 'STUDENT':
@@ -80,7 +120,7 @@ class ChargeViewSet(viewsets.ModelViewSet):
             
         return queryset
 
-    @action(detail=False, methods=['post'], url_path='generate-monthly')
+    @action(detail=False, methods=['post'], url_path='generate-monthly', permission_classes=[IsTreasuryStaff])
     def generate_monthly(self, request):
         """
         Generate charges for a concept for a list of students or a course.
@@ -98,7 +138,7 @@ class ChargeViewSet(viewsets.ModelViewSet):
         due_date = data.get('due_date')
         
         try:
-            concept = PaymentConcept.objects.get(pk=concept_id)
+            concept = PaymentConcept.objects.get(pk=concept_id, institution=request.user.institution)
             students = []
             
             if data.get('student_ids'):
@@ -130,7 +170,7 @@ class ChargeViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=400)
 
-    @action(detail=False, methods=['get'], url_path='financial-stats')
+    @action(detail=False, methods=['get'], url_path='financial-stats', permission_classes=[IsTreasuryStaff])
     def financial_stats(self, request):
         """
         Summary of pending payments grouped by course.
@@ -155,7 +195,7 @@ class ChargeViewSet(viewsets.ModelViewSet):
         if year_id:
             try:
                 from academic.models import AcademicYear
-                ay = AcademicYear.objects.get(pk=year_id)
+                ay = AcademicYear.objects.get(pk=year_id, institution_id=inst_id)
                 courses_query = courses_query.filter(year=ay.year)
             except (AcademicYear.DoesNotExist, ValueError):
                 pass
@@ -167,7 +207,7 @@ class ChargeViewSet(viewsets.ModelViewSet):
         if year_id:
             try:
                 from academic.models import AcademicYear
-                ay = AcademicYear.objects.get(pk=year_id)
+                ay = AcademicYear.objects.get(pk=year_id, institution_id=inst_id)
                 global_filter &= Q(student__enrollments__course__year=ay.year)
             except (AcademicYear.DoesNotExist, ValueError):
                 pass
@@ -211,16 +251,19 @@ class ChargeViewSet(viewsets.ModelViewSet):
             'total_debtors': total_debtors
         })
 
-class InvoiceViewSet(viewsets.ModelViewSet):
-    queryset = Invoice.objects.all().select_related('institution', 'student', 'payment_method').prefetch_related('details', 'details__concept')
+class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+    queryset = Invoice.objects.all().select_related('institution', 'student', 'customer', 'payment_method').prefetch_related('details', 'details__concept')
     serializer_class = InvoiceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    tenant_field = 'institution'
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy', 'process_payment', 'commercial_dashboard']:
+            return [IsTreasuryStaff()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         user = self.request.user
-        
-        # Optimized base queryset
-        queryset = Invoice.objects.all().select_related('institution', 'student', 'payment_method').prefetch_related('details', 'details__concept').order_by('-id')
+        queryset = super().get_queryset().order_by('-id')
 
         if user.role in ['STUDENT', 'PARENT']:
              # Can only see own invoices
@@ -231,11 +274,67 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                  return queryset.filter(student__id__in=children_ids)
         
         # Admin / Treasury: Allow filtering
+        customer_id = self.request.query_params.get('customer_id')
+        if customer_id:
+            queryset = queryset.filter(customer_id=customer_id)
+            
         student_id = self.request.query_params.get('student_id')
         if student_id:
-            queryset = queryset.filter(student_id=student_id)
+            queryset = queryset.filter(customer__student_id=student_id)
             
         return queryset
+
+    def perform_create(self, serializer):
+        # HARDENING: Inyectar usuario y asegurar institución
+        serializer.save(
+            created_by=self.request.user,
+            institution=self.request.user.institution
+        )
+
+    @action(detail=False, methods=['get'], url_path='commercial-dashboard')
+    def commercial_dashboard(self, request):
+        from django.db.models import Sum, Count
+        inst_id = self.request.user.institution_id
+        
+        # Base filter for the institution
+        base_qs = Invoice.objects.filter(institution_id=inst_id, status='ISSUED')
+        
+        # Total Sales
+        total_sales = base_qs.aggregate(total=Sum('total'))['total'] or 0
+        total_count = base_qs.count()
+        
+        # Sales by Customer Type
+        by_type = base_qs.values('customer__customer_type').annotate(
+            total=Sum('total'),
+            count=Count('id')
+        )
+        
+        # Formatting data
+        stats = {
+            'total_sales': float(total_sales),
+            'total_count': total_count,
+            'avg_ticket': float(total_sales / total_count) if total_count > 0 else 0,
+            'by_type': {
+                'STUDENT': 0,
+                'INDIVIDUAL': 0,
+                'COMPANY': 0,
+                'WALKIN': 0
+            },
+            'counts_by_type': {
+                'STUDENT': 0,
+                'INDIVIDUAL': 0,
+                'COMPANY': 0,
+                'WALKIN': 0
+            }
+        }
+        
+        for item in by_type:
+            c_type = item['customer__customer_type']
+            if c_type in stats['by_type']:
+                stats['by_type'][c_type] = float(item['total'])
+                stats['counts_by_type'][c_type] = item['count']
+                
+        return Response(stats)
 
     @action(detail=False, methods=['post'], url_path='process-payment')
     @transaction.atomic
@@ -252,68 +351,78 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         }
         """
         serializer = CreateInvoiceSerializer(data=request.data)
+        
+        customer_id = request.data.get('customer_id')
+        if not customer_id:
+            return Response({'error': 'customer_id es requerido'}, status=400)
+            
         if serializer.is_valid():
             data = serializer.validated_data
             
             try:
-                student = User.objects.get(pk=data['student_id'])
+                # 1. Determine Customer with SECURITY FIX
+                inst = request.user.institution
+                if customer_id:
+                    customer = Customer.objects.get(pk=customer_id, institution=inst)
+                elif student_id:
+                    # Legacy support/Auto-create if missing (though migration should have covered it)
+                    student = User.objects.get(pk=student_id, institution=inst)
+                    customer, _ = Customer.objects.get_or_create(
+                        student=student,
+                        institution=student.institution,
+                        defaults={
+                            'identification': student.cedula or '9999999999',
+                            'first_name': student.first_name,
+                            'last_name': student.last_name,
+                            'address': student.address or 'Sin dirección',
+                            'email': student.email or ''
+                        }
+                    )
                 
+                if not customer:
+                    raise Exception("Se requiere un cliente válido para facturar.")
+
                 pay_method_id = data.get('payment_method_id')
-                pay_method = PaymentMethod.objects.get(pk=pay_method_id) if pay_method_id else None
+                pay_method = PaymentMethod.objects.get(pk=pay_method_id, institution=inst) if pay_method_id else None
                 is_pending = request.data.get('is_pending', False)
                 
-                # Create Invoice Header
-                last_invoice = Invoice.objects.filter(institution=student.institution).order_by('-id').first()
+                # Create Invoice Header (Transactional & Safe)
+                from .utils import get_next_invoice_number
+                inst = customer.institution
+                est = getattr(inst, 'establishment_code', '001')
+                pto = getattr(inst, 'emission_point', '001')
                 
-                # Default SRI config
-                inst = student.institution
-                est = inst.establishment_code if hasattr(inst, 'establishment_code') else '001'
-                pto = inst.emission_point if hasattr(inst, 'emission_point') else '001'
-                
-                seq = 1
-                if last_invoice:
-                    # Try to parse last sequence
-                    # Formatos: "000000005" o "001-001-000000005"
-                    parts = last_invoice.number.split('-')
-                    if len(parts) == 3:
-                        try:
-                            seq = int(parts[2]) + 1
-                        except:
-                            pass
-                    elif last_invoice.number.isdigit():
-                        seq = int(last_invoice.number) + 1
-                
-                # Format: 001-001-000000001
-                invoice_number = f"{est}-{pto}-{seq:09d}" 
+                invoice_number = get_next_invoice_number(inst, est, pto)
                 
                 invoice = Invoice.objects.create(
-                    institution=student.institution or PaymentConcept.objects.first().institution, # Fallback
-                    student=student,
+                    institution=inst,
+                    customer=customer,
+                    student=customer.student, # Set legacy field for compatibility
                     number=invoice_number,
                     status='ISSUED',
-                    client_name=data.get('client_name', f"{student.first_name} {student.last_name}"),
-                    client_ruc=data.get('client_ruc', student.cedula or '9999999999999'),
-                    client_address=data.get('client_address') or student.address or 'Sin dirección',
-                    client_email=data.get('client_email') or student.email or '',
+                    client_name=data.get('client_name', f"{customer.first_name} {customer.last_name}"),
+                    client_ruc=data.get('client_ruc', customer.identification),
+                    client_address=data.get('client_address') or customer.address or 'Sin dirección',
+                    client_email=data.get('client_email') or customer.email or '',
                     payment_method=pay_method,
                     created_by=request.user
                 )
 
-                # UPDATE STUDENT PROFILE with new billing info if provided
-                profile_updated = False
+                # UPDATE CUSTOMER PROFILE if new billing info is provided
+                customer_updated = False
                 new_address = data.get('client_address')
                 new_email = data.get('client_email')
                 
-                if new_address and new_address != student.address:
-                    student.address = new_address
-                    profile_updated = True
+                if new_address and new_address != customer.address:
+                    customer.address = new_address
+                    customer_updated = True
                 
-                if new_email and new_email != student.email:
-                    student.email = new_email
-                    profile_updated = True
+                if new_email and new_email != customer.email:
+                    customer.email = new_email
+                    customer_updated = True
 
-                if profile_updated:
-                    student.save()
+                if customer_updated:
+                    customer.save()
 
                 total_0 = 0
                 total_15 = 0
@@ -321,7 +430,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 
                 # Create Details
                 for item in data['concepts']:
-                    concept = PaymentConcept.objects.get(pk=item['concept_id'])
+                    concept = PaymentConcept.objects.get(pk=item['concept_id'], institution=inst)
                     qty = item.get('quantity', 1)
                     
                     # Determine price: from charge if exists (snapshot) or current concept price
@@ -330,7 +439,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     
                     if item.get('charge_id'):
                         try:
-                            charge_obj = Charge.objects.get(pk=item['charge_id'])
+                            charge_obj = Charge.objects.get(pk=item['charge_id'], institution=inst)
                             if charge_obj.is_paid:
                                 raise Exception(f"La deuda '{charge_obj.concept.name}' ya se encuentra pagada.")
                                 
@@ -340,12 +449,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                                 charge_obj.save()
                         except Charge.DoesNotExist:
                             pass
-                    else:
+                        # Create temporary debt if needed
                         if is_pending:
                             from datetime import date
                             charge_obj = Charge.objects.create(
-                                institution=student.institution,
-                                student=student,
+                                institution=customer.institution,
+                                customer=customer,
+                                student=customer.student,
                                 concept=concept,
                                 amount=price * qty,
                                 due_date=date.today(),
@@ -364,6 +474,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                         total_0 += subtotal
                         
                     InvoiceDetail.objects.create(
+                        institution=inst,
                         invoice=invoice,
                         concept=concept,
                         quantity=qty,
@@ -378,9 +489,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 invoice.total = total_0 + total_15 + total_iva
                 invoice.save()
                 
+                # Trigger SRI Process automatically
+                process_invoice_sri.delay(invoice.id)
+
+                
                 # Register Payment if not pending
                 if not is_pending:
                     Payment.objects.create(
+                        institution=inst,
                         invoice=invoice,
                         amount_paid=invoice.total,
                         verified=True
@@ -390,12 +506,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 # Ideally, we should have a separate DEBT generation process.
                 # For now, simplistic approach: Payment is an INCOME.
                 # If we tracked debt, we would decrease debt.
-                # Let's verify if account exists
-                account, created = StudentAccount.objects.get_or_create(student=student, institution=student.institution or PaymentConcept.objects.first().institution)
-                # account.balance -= invoice.total # If debt was positive
-                # account.save()
+                # Update Balance (Only if it's a student)
+                if customer.student:
+                    account, created = StudentAccount.objects.get_or_create(student=customer.student, institution=customer.institution)
+                    # account.balance -= invoice.total 
+                    # account.save()
                 
-                return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
+                response_data = InvoiceSerializer(invoice).data
+                return Response(response_data, status=status.HTTP_201_CREATED)
 
             except Exception as e:
                 import traceback
@@ -430,31 +548,34 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if not students.exists():
                 return Response({'error': 'No se encontraron estudiantes para facturar.'}, status=status.HTTP_400_BAD_REQUEST)
                 
+            from .utils import get_next_invoice_number
             inst = students.first().institution or concept.institution
-            est = inst.establishment_code if hasattr(inst, 'establishment_code') else '001'
-            pto = inst.emission_point if hasattr(inst, 'emission_point') else '001'
+            est = getattr(inst, 'establishment_code', '001')
+            pto = getattr(inst, 'emission_point', '001')
             
-            # Obtener ultima secuencia
-            last_invoice = Invoice.objects.filter(institution=inst).order_by('-id').first()
-            seq = 1
-            if last_invoice:
-                parts = last_invoice.number.split('-')
-                if len(parts) == 3:
-                    try: seq = int(parts[2]) + 1
-                    except: pass
-                elif last_invoice.number.isdigit():
-                    seq = int(last_invoice.number) + 1
-                    
             from datetime import date
             created_count = 0
             
             for student in students:
-                invoice_number = f"{est}-{pto}-{seq:09d}"
-                seq += 1
+                invoice_number = get_next_invoice_number(inst, est, pto)
                 
+                # 0. Obtener o crear perfil de cliente para el estudiante
+                customer, _ = Customer.objects.get_or_create(
+                    student=student,
+                    institution=inst,
+                    defaults={
+                        'identification': student.cedula or f"NI-{student.id}",
+                        'first_name': student.first_name,
+                        'last_name': student.last_name,
+                        'email': student.email or '',
+                        'address': student.address or 'Sin dirección'
+                    }
+                )
+
                 # 1. Crear Deuda (Charge) ya que es pendiente (is_pending=True equivalent)
                 charge_obj = Charge.objects.create(
                     institution=inst,
+                    customer=customer,
                     student=student,
                     concept=concept,
                     amount=concept.price,
@@ -465,6 +586,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 # 2. Crear Factura
                 invoice = Invoice.objects.create(
                     institution=inst,
+                    customer=customer,
                     student=student,
                     number=invoice_number,
                     status='ISSUED',
@@ -503,6 +625,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 invoice.total = total_0 + total_15 + iva
                 invoice.save()
                 
+                # Trigger SRI Process automatically
+                process_invoice_sri.delay(invoice.id)
+
+                
                 # No se crea el 'Payment' log porque es pendiente.
                 created_count += 1
                 
@@ -520,163 +646,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def download_pdf(self, request, pk=None):
         invoice = self.get_object()
-        buffer = BytesIO()
-        
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib import colors
-        
-        c = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
-        
-        # --- HEADER (Institution Info) ---
-        inst = invoice.institution
-        
-        # Logo placeholder (commented out as we handle file paths carefully)
-        # if inst.logo:
-        #     try:
-        #         c.drawImage(inst.logo.path, 50, height - 100, width=100, preserveAspectRatio=True)
-        #     except: pass
-
-        c.setFont("Helvetica-Bold", 18)
-        c.drawString(50, height - 50, inst.name)
-        
-        c.setFont("Helvetica", 9)
-        c.drawString(50, height - 70, inst.address or "Dirección no registrada")
-        c.drawString(50, height - 85, f"Tel: {inst.phone}  |  Email: {inst.email}")
-        
-        if hasattr(inst, 'obligado_contabilidad'):
-            c.drawString(50, height - 100, f"Obligado a Llevar Contabilidad: {'SI' if inst.obligado_contabilidad else 'NO'}")
-            
-        if hasattr(inst, 'special_taxpayer_number') and inst.special_taxpayer_number:
-            c.drawString(50, height - 115, f"Contribuyente Especial No: {inst.special_taxpayer_number}")
-
-        # --- INVOICE BOX (RUC & Number) ---
-        c.setLineWidth(1)
-        c.rect(350, height - 130, 200, 100)
-        
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(360, height - 50, "R.U.C.: " + (inst.ruc if hasattr(inst, 'ruc') and inst.ruc else "9999999999999"))
-        
-        c.setFillColor(colors.white)
-        c.rect(350, height - 80, 200, 25, fill=1, stroke=1)
-        c.setFillColor(colors.black)
-        c.drawString(360, height - 73, "F A C T U R A")
-        
-        c.setFont("Helvetica", 11)
-        c.drawString(360, height - 100, f"No. {invoice.number}")
-        
-        # Authorization Info
-        c.setFont("Helvetica", 8)
-        c.drawString(360, height - 120, "AUTORIZACIÓN:")
-        # Show real authorization status if available
-        auth_status = invoice.sri_status if hasattr(invoice, 'sri_status') else 'PENDIENTE'
-        auth_date = invoice.sri_authorization_date.strftime("%d/%m/%Y %H:%M") if hasattr(invoice, 'sri_authorization_date') and invoice.sri_authorization_date else 'PENDIENTE'
-        
-        c.drawString(360, height - 130, f"{auth_status} / {auth_date}") 
-
-        # --- CLIENT INFO ---
-        y_client = height - 160
-        c.roundRect(40, y_client - 60, 515, 60, 5, stroke=1, fill=0)
-        
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(50, y_client - 15, f"Razón Social / Nombres y Apellidos:")
-        c.setFont("Helvetica", 9)
-        c.drawString(230, y_client - 15, invoice.client_name.upper())
-
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(50, y_client - 30, f"Fecha Emisión:")
-        c.setFont("Helvetica", 9)
-        c.drawString(130, y_client - 30, invoice.issue_date.strftime("%d/%m/%Y"))
-
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(350, y_client - 30, f"RUC / CI:")
-        c.setFont("Helvetica", 9)
-        c.drawString(400, y_client - 30, invoice.client_ruc)
-        
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(50, y_client - 45, f"Dirección:")
-        c.setFont("Helvetica", 9)
-        c.drawString(110, y_client - 45, invoice.client_address[:80]) # Truncate if too long
-
-        # --- DETAILS HEADER ---
-        y_table = y_client - 90
-        c.setFillColor(colors.lightgrey)
-        c.rect(40, y_table, 515, 20, fill=1, stroke=1)
-        c.setFillColor(colors.black)
-        
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(50, y_table + 6, "Cod.")
-        c.drawString(90, y_table + 6, "Cant")
-        c.drawString(130, y_table + 6, "Descripción")
-        c.drawString(400, y_table + 6, "P. Unitario")
-        c.drawString(480, y_table + 6, "Precio Total")
-        
-        # --- DETAILS ROWS ---
-        y = y_table - 20
-        c.setFont("Helvetica", 9)
-        
-        for detail in invoice.details.all():
-            c.drawString(50, y, str(detail.concept.id))
-            c.drawString(90, y, str(detail.quantity))
-            c.drawString(130, y, detail.concept.name[:50])
-            c.drawRightString(450, y, f"{detail.unit_price:.2f}")
-            c.drawRightString(540, y, f"{detail.subtotal:.2f}")
-            y -= 15
-            
-            # Page Break Check (Simple)
-            if y < 100:
-                c.showPage()
-                y = height - 50
-
-        # --- TOTALS ---
-        y_totals = y - 20
-        
-        # Payment Method Box
-        c.rect(40, y_totals - 60, 300, 60)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(50, y_totals - 15, "Forma de Pago")
-        c.setFont("Helvetica", 9)
-        pay_method_name = invoice.payment_method.name if invoice.payment_method else "Otros con Utilización del Sistema Financiero"
-        c.drawString(50, y_totals - 30, pay_method_name)
-        c.drawString(250, y_totals - 30, f"{invoice.total:.2f}")
-
-        # Totals Box
-        x_totals = 360
-        w_totals = 195
-        row_h = 15
-        
-        # Labels
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(x_totals + 5, y_totals - 15, "SUBTOTAL 15%")
-        c.drawString(x_totals + 5, y_totals - 30, "SUBTOTAL 0%")
-        c.drawString(x_totals + 5, y_totals - 45, "SUBTOTAL Sin Impuestos")
-        c.drawString(x_totals + 5, y_totals - 60, "IVA 15%")
-        c.drawString(x_totals + 5, y_totals - 75, "VALOR TOTAL")
-        
-        # Values
-        c.setFont("Helvetica", 9)
-        c.drawRightString(x_totals + w_totals - 5, y_totals - 15, f"{invoice.subtotal_15:.2f}")
-        c.drawRightString(x_totals + w_totals - 5, y_totals - 30, f"{invoice.subtotal_0:.2f}")
-        c.drawRightString(x_totals + w_totals - 5, y_totals - 45, f"{(invoice.subtotal_0 + invoice.subtotal_15):.2f}")
-        c.drawRightString(x_totals + w_totals - 5, y_totals - 60, f"{invoice.iva_total:.2f}")
-        
-        c.setFont("Helvetica-Bold", 10)
-        c.drawRightString(x_totals + w_totals - 5, y_totals - 75, f"{invoice.total:.2f}")
-        
-        # Grid for totals
-        c.rect(x_totals, y_totals - 80, w_totals, 80)
-        c.line(x_totals, y_totals - 20, x_totals + w_totals, y_totals - 20)
-        c.line(x_totals, y_totals - 35, x_totals + w_totals, y_totals - 35)
-        c.line(x_totals, y_totals - 50, x_totals + w_totals, y_totals - 50)
-        
-        c.showPage()
-        c.save()
-        
-        buffer.seek(0)
-        response = HttpResponse(buffer, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="Factura_{invoice.number}.pdf"'
-        return response
+        try:
+            from treasury.utils import generate_invoice_pdf
+            pdf_bytes = generate_invoice_pdf(invoice)
+            from django.http import HttpResponse
+            response = HttpResponse(pdf_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="Factura_{invoice.number}.pdf"'
+            return response
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=True, methods=['get'])
     def download_xml(self, request, pk=None):
@@ -690,102 +668,240 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="Factura_{invoice.number}.xml"'
         return response
 
+    @action(detail=True, methods=['post'], url_path='send-email', permission_classes=[IsTreasuryStaff])
+    def send_email(self, request, pk=None):
+        """
+        Envío manual/reenvío de la factura al correo registrado.
+        Soporta parámetro 'sync=true' para administradores en caso de emergencia.
+        """
+        invoice = self.get_object()
+        is_sync = request.query_params.get('sync') == 'true' and request.user.role in ['ADMIN', 'LOCAL_ADMIN']
+        
+        # 1. Validación Previa de Email
+        if not invoice.client_email:
+            return Response({'error': 'El cliente no tiene un correo electrónico registrado. Por favor, actualice los datos del cliente antes de enviar.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Validación de estado SRI
+        if invoice.sri_status != 'AUTHORIZED' and invoice.status != 'ISSUED':
+             return Response({'error': 'Solo se pueden enviar correos de facturas emitidas o autorizadas.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Rate Limiting (Máximo 5 reenvíos por hora)
+        one_hour_ago = timezone.now() - datetime.timedelta(hours=1)
+        recent_logs_count = EmailLog.objects.filter(
+            institution=invoice.institution,
+            reference_id=str(invoice.id),
+            module_origin='treasury.invoice',
+            created_at__gte=one_hour_ago
+        ).exclude(send_type='AUTO').count()
+
+        if recent_logs_count >= 5:
+            return Response({'error': 'Se ha superado el límite de 5 reenvíos por hora para esta factura.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        # 4. Determinar tipo de envío
+        has_been_sent = EmailLog.objects.filter(institution=invoice.institution, reference_id=str(invoice.id), module_origin='treasury.invoice', status='sent').exists()
+        send_type = 'REENVIO' if has_been_sent else 'MANUAL'
+
+        try:
+            from notifications.tasks import send_invoice_email_task
+            if is_sync:
+                # Envío síncrono controlado (Fallback manual)
+                success = send_invoice_email_task(
+                    invoice_id=invoice.id, 
+                    sent_by_id=request.user.id, 
+                    send_type=send_type
+                )
+                if success:
+                    return Response({'message': f'Correo ({send_type}) enviado exitosamente (Sincrónico).'})
+                else:
+                    return Response({'error': 'El envío síncrono falló. Verifique la configuración SMTP.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+                # Envío asíncrono estándar
+                send_invoice_email_task.delay(
+                    invoice_id=invoice.id, 
+                    sent_by_id=request.user.id, 
+                    send_type=send_type
+                )
+                return Response({'message': f'Correo ({send_type}) encolado con éxito.'})
+        except Exception as e:
+            logger.error(f"Error triggering invoice email: {str(e)}")
+            return Response({'error': f"Error al procesar el envío: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'], url_path='send-to-alt-email', permission_classes=[IsTreasuryStaff])
+    def send_to_alt_email(self, request, pk=None):
+        """
+        Envío de la factura a un correo alternativo proporcionado por el usuario.
+        """
+        invoice = self.get_object()
+        alt_email = request.data.get('email')
+
+        if not alt_email:
+            return Response({'error': 'Se requiere un correo electrónico destinatario.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Rate Limiting
+        one_hour_ago = timezone.now() - datetime.timedelta(hours=1)
+        recent_logs_count = EmailLog.objects.filter(
+            institution=invoice.institution,
+            reference_id=str(invoice.id),
+            module_origin='treasury.invoice',
+            created_at__gte=one_hour_ago
+        ).exclude(send_type='AUTO').count()
+
+        if recent_logs_count >= 5:
+            return Response({'error': 'Límite de reenvíos excedido para esta factura.'}, status=status.HTTP_429_TOO_MANY_REQUESTS)
+
+        try:
+            from notifications.tasks import send_invoice_email_task
+            send_invoice_email_task.delay(
+                invoice_id=invoice.id, 
+                recipient=alt_email,
+                sent_by_id=request.user.id, 
+                send_type='DESTINATARIO_ALTERNO'
+            )
+            return Response({'message': 'Correo alternativo encolado con éxito.'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['get'], url_path='email-history', permission_classes=[IsTreasuryStaff])
+    def email_history(self, request, pk=None):
+        """
+        Consulta el historial de correos enviados para esta factura usando la relación directa y los logs.
+        """
+        invoice = self.get_object()
+        
+        logs = EmailLog.objects.filter(
+            institution=invoice.institution,
+            reference_id=str(invoice.id),
+            module_origin='treasury.invoice'
+        ).order_by('-created_at')
+        
+        serializer = EmailLogSerializer(logs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='sri-monitoring')
+    def sri_monitoring(self, request):
+        """
+        Operational dashboard metrics and list.
+        """
+        from django.db.models import Count, Q
+        from django.utils import timezone
+        import datetime
+        
+        inst_id = self.request.user.institution_id
+        today = timezone.now().date()
+        
+        # 1. Metrics
+        metrics = Invoice.objects.filter(institution_id=inst_id).aggregate(
+            pending_sri=Count('id', filter=Q(sri_status='DRAFT')),
+            retry_queue=Count('id', filter=Q(sri_status='PENDING_SRI')),
+            authorized_today=Count('id', filter=Q(sri_status='AUTHORIZED', sri_authorization_date__date=today)),
+            rejected_today=Count('id', filter=Q(sri_status='REJECTED', updated_at__date=today))
+        )
+        
+        # 2. Latest SRI Invoices (Filterable by status)
+        status_filter = request.query_params.get('status')
+        qs = Invoice.objects.filter(institution_id=inst_id).exclude(sri_status='DRAFT').order_by('-id')
+        
+        if status_filter:
+            qs = qs.filter(sri_status=status_filter)
+            
+        # Optimization: Only select needed fields
+        # Note: 'institution' is needed for TenantModel logic usually, but here we are in a ViewSet with institution context
+        invoices = qs[:50]
+        
+        # Format data
+        invoice_list = []
+        for inv in invoices:
+            last_resp = "-"
+            if inv.sri_response:
+                reception = inv.sri_response.get('reception', {})
+                auth = inv.sri_response.get('authorization', {})
+                last_resp = auth.get('msg') or reception.get('msg') or "-"
+                messages = auth.get('messages') or reception.get('messages') or []
+                
+            invoice_list.append({
+                'id': inv.id,
+                'number': inv.number,
+                'client_name': inv.client_name,
+                'status': inv.sri_status,
+                'attempts': inv.sri_attempts,
+                'last_response': last_resp,
+                'messages': messages,
+                'access_key': inv.access_key,
+                'updated_at': inv.updated_at
+            })
+            
+        return Response({
+            'metrics': metrics,
+            'invoices': invoice_list
+        })
+
+    @action(detail=True, methods=['post'], url_path='preflight-check')
+    def preflight_check(self, request, pk=None):
+        """
+        Realiza una validación estructural y de firma antes de enviar al SRI.
+        """
+        invoice = self.get_object()
+        from .sri.xml_generator import InvoiceXmlBuilder
+        from .sri.signer import XadesSigner
+        
+        try:
+            # 1. Generar XML
+            builder = InvoiceXmlBuilder(invoice)
+            access_key, xml_str = builder.build_xml()
+            
+            # 2. Intentar Firmar (si hay firma)
+            inst = invoice.institution
+            if not inst.sri_p12_file or not inst.sri_p12_password:
+                return Response({'error': 'No se ha configurado firma electrónica para esta institución.'}, status=400)
+            
+            signer = XadesSigner(inst.sri_p12_file.path, inst.sri_p12_password)
+            signed_xml = signer.sign_xml(xml_str)
+            
+            # 3. Validación básica estructural
+            from lxml import etree
+            etree.fromstring(signed_xml.encode('utf-8'))
+            
+            return Response({
+                'valid': True,
+                'message': 'Validación estructural y firma exitosa.',
+                'access_key': access_key
+            })
+        except Exception as e:
+            return Response({
+                'valid': False,
+                'error': str(e)
+            }, status=400)
+
     @action(detail=True, methods=['post'], url_path='send-sri')
     def send_sri(self, request, pk=None):
         """
-        Envía la factura al SRI (Generar XML -> Firmar -> Enviar -> Autorizar).
+        Inicia el proceso asíncrono de envío al SRI.
         """
         invoice = self.get_object()
         
         if invoice.sri_status == 'AUTHORIZED':
-            return Response({'message': 'Esta factura ya está autorizada.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Esta factura ya está autorizada.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Imports dinámicos
-        try:
-            from treasury.sri.xml_generator import InvoiceXmlBuilder
-            from treasury.sri.signer import XadesSigner
-            from treasury.sri.client import SriClient
-            import os
-        except ImportError as e:
-            return Response({'error': f"Módulos SRI no instalados: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        try:
-            # 2. Generar XML
-            builder = InvoiceXmlBuilder(invoice)
-            access_key, xml_content = builder.build_xml()
-            
-            # Guardamos la clave si no existe
-            invoice.access_key = access_key
+        # Reset status if it was rejected to allow retry
+        if invoice.sri_status == 'REJECTED':
+            invoice.sri_status = 'DRAFT'
             invoice.save()
 
-            # 3. Firmar XML
-            inst = invoice.institution
-            if not inst.electronic_signature or not os.path.exists(inst.electronic_signature.path):
-                return Response({'error': "La institución no tiene firma electrónica configurada (.p12)."}, status=status.HTTP_400_BAD_REQUEST)
-            
-            signed_xml = ""
-            try:
-                signer = XadesSigner(inst.electronic_signature.path, inst.signature_password)
-                signed_xml = signer.sign_xml(xml_content)
-                invoice.xml_content = signed_xml
-                invoice.save()
-            except Exception as e:
-                return Response({'error': f"Error al firmar XML: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # 4. Enviar al SRI (Recepción)
-            # Determinar ambiente (1=Pruebas)
-            urls = {
-                'reception_test': inst.sri_url_reception_test,
-                'authorization_test': inst.sri_url_authorization_test,
-                'reception_prod': inst.sri_url_reception_prod,
-                'authorization_prod': inst.sri_url_authorization_prod
-            }
-            client = SriClient(inst.sri_environment, urls=urls)
-            
-            success, msg, code = client.send_receipt(signed_xml)
-            invoice.sri_status = code if code in ['PENDING', 'SENT', 'AUTHORIZED', 'REJECTED'] else 'SENT'
-            invoice.sri_response = {'recepcion': msg}
-            invoice.save()
-
-            if not success and code != 'RECIBIDA': # RECIBIDA es el éxito
-                 return Response({
-                     'message': 'Error en Recepción SRI', 
-                     'details': msg, 
-                     'status': invoice.sri_status
-                 }, status=status.HTTP_400_BAD_REQUEST)
-
-            # 5. Solicitar Autorización (Inmediata)
-            # Esperamos un momento? SRI a veces tarda millis/segundos. 
-            import time
-            time.sleep(2) 
-            
-            auth_success, auth_msg, auth_code, full_resp = client.request_authorization(access_key)
-            
-            invoice.sri_status = auth_code if auth_code in ['AUTHORIZED', 'REJECTED'] else invoice.sri_status
-            
-            # Merge responses
-            current_resp = invoice.sri_response or {}
-            current_resp['autorizacion'] = auth_msg
-            current_resp['full_auth_xml'] = full_resp
-            invoice.sri_response = current_resp
-            
-            if auth_code == 'AUTHORIZED':
-                 invoice.sri_authorization_date = timezone.now() # Idealmente parsear del XML respuesta
-                 invoice.save()
-                 return Response({'message': 'Factura Autorizada por el SRI', 'status': 'AUTHORIZED'})
-            else:
-                 invoice.save()
-                 return Response({'message': f'Factura Enviada pero no Autorizada: {auth_msg}', 'status': invoice.sri_status})
-
+        try:
+            from .tasks import process_invoice_sri
+            process_invoice_sri.delay(invoice.id)
+            return Response({
+                'message': 'Proceso de facturación electrónica iniciado en segundo plano.',
+                'status': invoice.sri_status
+            })
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({'error': f"Error al encolar tarea: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class CreditNoteViewSet(viewsets.ModelViewSet):
+class CreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = CreditNote.objects.all().select_related('invoice')
     serializer_class = CreditNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'invoice__institution'
 
     def get_queryset(self):
         user = self.request.user
@@ -799,7 +915,9 @@ class CreditNoteViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        last_note = CreditNote.objects.order_by('-id').first()
+        # HARDENING: Filtrar por institución del usuario para evitar fugas de secuencia
+        inst = self.request.user.institution
+        last_note = CreditNote.objects.filter(invoice__institution=inst).order_by('-id').first()
         seq = (last_note.id + 1) if last_note else 1
         number = f"NC-{str(seq).zfill(6)}"
         serializer.save(number=number)
@@ -821,7 +939,9 @@ class DebitNoteViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        last_note = DebitNote.objects.order_by('-id').first()
+        # HARDENING: Filtrar por institución del usuario para evitar fugas de secuencia
+        inst = self.request.user.institution
+        last_note = DebitNote.objects.filter(invoice__institution=inst).order_by('-id').first()
         seq = (last_note.id + 1) if last_note else 1
         number = f"ND-{str(seq).zfill(6)}"
         serializer.save(number=number)

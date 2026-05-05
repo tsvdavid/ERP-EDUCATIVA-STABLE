@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'channels',
+    'django_celery_results',
 
     # Local
     'core',
@@ -61,12 +62,15 @@ INSTALLED_APPS = [
     'helpdesk',
     'privacy',
     'maintenance',
+    'notifications.apps.NotificationsConfig',
     'payments',
     'procedures',
     'learning',
     'knowledge',
     'ai',
     'health',
+    'payroll',
+    'subscriptions',
 ]
 
 MIDDLEWARE = [
@@ -80,6 +84,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.TenantMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -142,7 +147,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'es-ec'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Guayaquil'
 
 USE_I18N = True
 
@@ -243,5 +248,16 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'notifications': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
 }
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# Fallback email backend if SMTP is not fully configured
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'localhost')
+EMAIL_PORT = os.environ.get('EMAIL_PORT', 1025)

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils.translation import gettext_lazy as _
+from core.models import TenantManager
 
 class Institution(models.Model):
     name = models.CharField(max_length=255)
@@ -32,11 +33,31 @@ class Institution(models.Model):
     sri_url_reception_prod = models.URLField(default="https://cel.sri.gob.ec/comprobantes-electronicos-ws/RecepcionComprobantesOffline", verbose_name="URL Recepción (Producción)")
     sri_url_authorization_prod = models.URLField(default="https://cel.sri.gob.ec/comprobantes-electronicos-ws/AutorizacionComprobantesOffline", verbose_name="URL Autorización (Producción)")
     
+    is_active = models.BooleanField(default=True, verbose_name="Institución Activa")
+    
+    # SaaS Onboarding Tracking
+    SETUP_STATUS_CHOICES = [
+        ('PENDING', 'Pendiente'),
+        ('IN_PROGRESS', 'En Proceso'),
+        ('READY_MINIMAL', 'Infraestructura Base Lista'),
+        ('READY_FULL', 'Configuración Completa'),
+        ('FAILED', 'Fallido'),
+    ]
+    setup_status = models.CharField(max_length=20, choices=SETUP_STATUS_CHOICES, default='PENDING')
+    setup_error = models.TextField(null=True, blank=True)
+    setup_completed_at = models.DateTimeField(null=True, blank=True)
+    wizard_completed = models.BooleanField(default=False)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} {'(INACTIVA)' if not self.is_active else ''}"
+
+    def delete(self, *args, **kwargs):
+        """Soft Delete."""
+        self.is_active = False
+        self.save()
 
 class User(AbstractUser):
     class Role(models.TextChoices):
@@ -71,6 +92,8 @@ class User(AbstractUser):
         choices=Role.choices, 
         default=Role.STUDENT
     )
+    
+    objects = TenantManager()
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     birth_date = models.DateField(null=True, blank=True)

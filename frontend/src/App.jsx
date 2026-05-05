@@ -151,6 +151,18 @@ const RoleGuard = ({ children, allowedRoles }) => {
   return children;
 };
 
+const DevRouteGuard = ({ children }) => {
+  const { isAuthenticated, user, isLoading } = useAuthStore();
+  if (isLoading) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-bold">Verificando acceso...</div>;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  
+  const isGlobal = user?.role === 'GLOBAL' || user?.is_superuser === true;
+  if (!isGlobal) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
+
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
   if (isLoading) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-bold">Verificando sesión...</div>;
@@ -227,14 +239,14 @@ function App() {
               <Route path="accounting/entries" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><JournalEntriesPage /></RoleGuard>} />
               <Route path="accounting/entries/new" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><JournalEntryForm /></RoleGuard>} />
               <Route path="accounting/ledger" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><LedgerPage /></RoleGuard>} />
-              <Route path="accounting/reports" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><ReportsPage /></RoleGuard>} />
-              <Route path="accounting/dashboard" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><ComingSoonPage title="Dashboard Contable" /></RoleGuard>} />
-              <Route path="accounting/taxes" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><ComingSoonPage title="IVA y Tributos" /></RoleGuard>} />
-              <Route path="accounting/coming-soon/bank-reconciliation" element={<ComingSoonPage title="Conciliación Bancaria" />} />
+               <Route path="accounting/reports" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']}><ReportsPage /></RoleGuard>} />
+              <Route path="accounting/dashboard" element={<DevRouteGuard><ComingSoonPage title="Dashboard Contable" /></DevRouteGuard>} />
+              <Route path="accounting/taxes" element={<DevRouteGuard><ComingSoonPage title="IVA y Tributos" /></DevRouteGuard>} />
+              <Route path="accounting/coming-soon/bank-reconciliation" element={<DevRouteGuard><ComingSoonPage title="Conciliación Bancaria" /></DevRouteGuard>} />
               <Route path="accounting/closing" element={<FiscalYearsPage />} />
-              <Route path="accounting/analysis" element={<ComingSoonPage title="Análisis y Reportes" />} />
-              <Route path="accounting/integrations" element={<ComingSoonPage title="Integraciones y Automatizaciones" />} />
-              <Route path="accounting/settings" element={<ComingSoonPage title="Configuración y Seguridad Contable" />} />
+              <Route path="accounting/analysis" element={<DevRouteGuard><ComingSoonPage title="Análisis y Reportes" /></DevRouteGuard>} />
+              <Route path="accounting/integrations" element={<DevRouteGuard><ComingSoonPage title="Integraciones y Automatizaciones" /></DevRouteGuard>} />
+              <Route path="accounting/settings" element={<DevRouteGuard><ComingSoonPage title="Configuración y Seguridad Contable" /></DevRouteGuard>} />
               <Route path="accounting/banks" element={<BanksPage />} />
               <Route path="accounting/bank-accounts" element={<BankAccountsPage />} />
               <Route path="accounting/assets" element={<AssetsPage />} />

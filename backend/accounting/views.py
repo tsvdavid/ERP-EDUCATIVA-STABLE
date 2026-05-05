@@ -11,6 +11,7 @@ from .serializers import (
 from decimal import Decimal
 from django.utils import timezone
 from users.tenant_mixins import InstitutionFilterMixin
+from users.permissions import IsGlobalAdmin
 
 class FiscalYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = FiscalYear.objects.all()
@@ -239,6 +240,12 @@ from django.db.models import Sum, Q
 
 class ReportViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        # Protegemos reportes que están en desarrollo en el frontend
+        if self.action in ['ats']: # Añadir más si es necesario
+            return [IsGlobalAdmin()]
+        return [permissions.IsAuthenticated()]
 
     def list(self, request):
         return Response([])
@@ -606,7 +613,7 @@ class FixedAssetViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 class AccountingConfigViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = AccountingConfig.objects.all()
     serializer_class = AccountingConfigSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsGlobalAdmin]
     tenant_field = 'institution'
 
     def get_queryset(self):

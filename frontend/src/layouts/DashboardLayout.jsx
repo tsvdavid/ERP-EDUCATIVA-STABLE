@@ -169,18 +169,18 @@ const DashboardLayout = () => {
         // ==========================
 
         // 1. Contabilidad (Core)
-        { section: 'Módulo Contable', path: '/dashboard/accounting/dashboard', label: 'Dashboard Contable', icon: LayoutDashboard, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/dashboard', label: 'Dashboard Contable', icon: LayoutDashboard, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
         { section: 'Módulo Contable', path: '/dashboard/accounting/accounts', label: 'Catálogo Contable', icon: Book, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
         { section: 'Módulo Contable', path: '/dashboard/accounting/entries', label: 'Libro Diario', icon: BookOpen, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
         { section: 'Módulo Contable', path: '/dashboard/accounting/ledger', label: 'Libro Mayor', icon: BarChart, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
         { section: 'Módulo Contable', path: '/dashboard/accounting/reports', label: 'Estados Financieros', icon: TrendingUp, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
-        { section: 'Módulo Contable', path: '/dashboard/accounting/taxes', label: 'IVA y Tributos', icon: Landmark, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
-        { section: 'Módulo Contable', path: '/dashboard/accounting/coming-soon/bank-reconciliation', label: 'Conciliación Bancaria', icon: Building, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/taxes', label: 'IVA y Tributos', icon: Landmark, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/coming-soon/bank-reconciliation', label: 'Conciliación Bancaria', icon: Building, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
         { section: 'Módulo Contable', path: '/dashboard/accounting/assets', label: 'Activos Fijos', icon: Package, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
         { section: 'Módulo Contable', path: '/dashboard/accounting/closing', label: 'Cierre Contable', icon: Lock, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
-        { section: 'Módulo Contable', path: '/dashboard/accounting/analysis', label: 'Análisis y Reportes', icon: PieChart, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
-        { section: 'Módulo Contable', path: '/dashboard/accounting/integrations', label: 'Integraciones', icon: LinkIcon, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
-        { section: 'Módulo Contable', path: '/dashboard/accounting/settings', label: 'Configuración / Seguridad', icon: Settings, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/analysis', label: 'Análisis y Reportes', icon: PieChart, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/integrations', label: 'Integraciones', icon: LinkIcon, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
+        { section: 'Módulo Contable', path: '/dashboard/accounting/settings', label: 'Configuración / Seguridad', icon: Settings, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'], isDev: true },
 
         // 2. Ventas
         { section: 'Ventas', path: '/dashboard/treasury/commercial-dashboard', label: 'Dashboard Comercial', icon: PieChart, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
@@ -230,7 +230,17 @@ const DashboardLayout = () => {
     const groupedNavItems = React.useMemo(() => {
         const filtered = navItems.filter(item => {
             if (!user) return false;
-            return item.roles.includes(user.role);
+            
+            // Check role permission
+            const hasRole = item.roles.includes(user.role);
+            if (!hasRole) return false;
+
+            // Check if it's a dev module
+            if (item.isDev) {
+                return user.role === 'GLOBAL' || user.is_superuser;
+            }
+
+            return true;
         });
 
         return filtered.reduce((acc, item) => {

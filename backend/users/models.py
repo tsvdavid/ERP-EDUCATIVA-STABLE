@@ -61,6 +61,7 @@ class Institution(models.Model):
 
 class User(AbstractUser):
     class Role(models.TextChoices):
+        GLOBAL = 'GLOBAL', _('Administrador Global')
         ADMIN = 'ADMIN', _('Administrador')
         LOCAL_ADMIN = 'LOCAL_ADMIN', _('Administrador Local')
         ACCOUNTANT = 'ACCOUNTANT', _('Auditor Contable')

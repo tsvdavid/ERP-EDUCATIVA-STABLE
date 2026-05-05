@@ -76,3 +76,12 @@ class CanManageUser(permissions.BasePermission):
         if user.role == 'TEACHER' and obj.role == 'STUDENT':
             return view.action in ['retrieve', 'update', 'partial_update']
         return False
+
+class IsGlobalAdmin(permissions.BasePermission):
+    """Acceso restringido a módulos en desarrollo."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.role == 'GLOBAL' or request.user.is_superuser)
+        )

@@ -22,3 +22,15 @@ debug_*.txt
 # Office Temp files
 ~$*
 ~*.tmp
+
+# ==== ERP‑EDUCATIVA – Private / generated files ====
+# Private certificates
+backend/media/institutions/signatures/*.p12
+
+# Backups
+backups/
+
+# Temporary report output
+backend/media/reports_temp/
+backend/reports/
+backend/static/

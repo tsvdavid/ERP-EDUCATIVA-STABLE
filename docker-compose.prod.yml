@@ -27,6 +27,8 @@ services:
     depends_on:
       - db
       - redis
+    environment:
+      DB_HOST: db
     env_file:
       - ./backend/.env
 
@@ -34,6 +36,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: erp-temp-frontend:dev
     restart: always
     environment:
       - API_PROXY_TARGET=http://backend:8000
@@ -55,6 +58,15 @@ services:
     depends_on:
       - backend
       - frontend
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel run --token ${CLOUDFLARED_TOKEN}
+    env_file:
+      - ./cloudflared.env
+    depends_on:
+      - nginx
 
   celery_worker:
     build:

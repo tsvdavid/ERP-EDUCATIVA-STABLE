@@ -25,7 +25,7 @@ const SriMonitoringPage = () => {
 
     useEffect(() => {
         loadData();
-        const interval = setInterval(() => loadData(), 30000); // Auto refresh 30s
+        const interval = setInterval(() => loadData(), 20000); // Auto refresh 20s
         return () => clearInterval(interval);
     }, [filter]);
 

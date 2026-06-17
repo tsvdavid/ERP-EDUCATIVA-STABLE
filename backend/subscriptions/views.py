@@ -102,8 +102,14 @@ class SubscriptionAdminViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def modules(self, request):
         from .serializers import ModuleSerializer
-        modules = Module.objects.all()
-        return Response(ModuleSerializer(modules, many=True).data)
+        institution = getattr(request, "tenant", None)
+        if not institution:
+            return Response([], status=200)
+        qs = Module.objects.filter(
+            subscriptionmodule__subscription__institution=institution,
+            subscriptionmodule__subscription__status="ACTIVE"
+        ).distinct()
+        return Response(ModuleSerializer(qs, many=True).data)
 
     @action(detail=False, methods=['get'])
     def dashboard(self, request):

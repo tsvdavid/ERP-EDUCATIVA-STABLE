@@ -112,7 +112,12 @@ const MODULES = [
 const DashboardHome = () => {
     const { user } = useAuthStore();
 
-    const allowedModules = MODULES.filter(m => m.roles.includes(user?.role));
+    const allowedModules =
+    user?.role === 'GLOBAL' || user?.is_superuser
+        ? MODULES
+        : MODULES.filter(
+              m => m.roles.includes(user?.role)
+          );
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">

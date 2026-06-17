@@ -21,7 +21,7 @@ export const SocketProvider = ({ children }) => {
             
             if (token) {
                 // Connect to WebSocket with token in query string
-                const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                const apiUrl = import.meta.env.VITE_API_URL || '/api';
                 const wsBase = apiUrl.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
                 const wsUrl = `${wsBase}/ws/notifications/?token=${token}`;
                 

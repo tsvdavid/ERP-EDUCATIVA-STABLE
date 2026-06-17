@@ -3,6 +3,10 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        # Debug output to verify authentication
+        print("===== WEBSOCKET AUTH =====")
+        print("USER:", self.scope.get("user"))
+        print("AUTH:", getattr(self.scope.get("user"), "is_authenticated", False))
         self.user = self.scope["user"]
         
         if self.user.is_anonymous:

@@ -250,6 +250,12 @@ const DashboardLayout = () => {
             return acc;
         }, {});
     }, [user, navItems]);
+        console.log('===== MENU DEBUG =====');
+        console.log('USER FROM DASHBOARD:', user);
+        console.log('ROLE:', user?.role);
+        console.log('GROUPED ITEMS:', groupedNavItems);
+        console.log('NAV TOTAL:', navItems.length);
+        console.log('SIDEBAR STATE:', isSidebarOpen);
 
     return (
         <div className="flex h-screen bg-slate-50 relative">
@@ -265,8 +271,8 @@ const DashboardLayout = () => {
             <aside className={`
                 fixed inset-y-0 left-0 z-40
                 w-72 bg-slate-950 text-white flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
-                md:relative md:translate-x-0
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                md:relative md:translate-x-0
             `}>
                 <div className="p-8 flex flex-col items-center border-b border-slate-900">
                     <div className="w-full flex items-center justify-center gap-3 mb-2">

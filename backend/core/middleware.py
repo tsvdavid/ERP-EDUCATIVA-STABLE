@@ -14,56 +14,47 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # DRF Support: Si no hay usuario, intentamos JWT manual
-        if not request.user or not request.user.is_authenticated:
-            from rest_framework_simplejwt.authentication import JWTAuthentication
-            try:
-                auth = JWTAuthentication().authenticate(request)
-                if auth:
-                    request.user = auth[0]
-            except:
-                pass
+        # ---------- Bypass total para rutas de autenticación ----------
+        is_auth_route = request.path.startswith("/api/token/") or request.path.startswith(
+            "/api/auth/"
+        )
+        if is_auth_route:
+            # No establecemos tenant ni RLS en login/registro
+            request.tenant = None
+            clear_current_tenant()
+            return self.get_response(request)
+
+        # ---------- JWT authentication sólo para rutas protegidas ----------
+        # Authentication is handled by Django's AuthenticationMiddleware; no JWT processing here.
+        if hasattr(request, "user") and request.user.is_authenticated:
+            pass
 
         tenant = None
         # Extraer institution_id del header
         header_institution = request.headers.get('X-Institution-ID')
         
-        # Extraer institution_id del token (si existe)
-        token_institution = None
-        auth_header = request.headers.get('Authorization')
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-            try:
-                from rest_framework_simplejwt.tokens import AccessToken
-                access_token = AccessToken(token)
-                token_institution = access_token.get('institution')
-            except:
-                pass
+        # JWT decoding is performed in JwtBootstrapMiddleware.
+        # Here we only rely on request.institution_id (set by the bootstrap) and the X‑Institution‑ID header.
+        token_institution = None  # not used in this middleware
         
-        # REGLA: Eximir rutas públicas de autenticación del header
-        is_auth_route = request.path.startswith('/api/token/') or request.path.startswith('/api/auth/')
+        # Duplicate is_auth_route block removed (already handled above)
+        # is_auth_route = request.path.startswith('/api/token/') or request.path.startswith('/api/auth/')  # redundant
         
-        if is_auth_route:
-            # En rutas de autenticación, no confiamos en el header (puede estar cacheado en el frontend de una sesión previa)
-            # Esto evita que authenticate() falle por RLS al buscar un superusuario (inst 1) con el header de otra inst (25)
+        # if is_auth_route:  # redundant
+            # En rutas de autenticación, no confiamos en el header (puede estar cacheado en el frontend de una sesión previa)  # redundant
+            # Esto evita que authenticate() falle por RLS al buscar un superusuario (inst 1) con el header de otra inst (25)  # redundant
+            # pass  # redundant
+        # Resolve tenant ID with explicit priority:
+        # 1️⃣ request.institution_id (set by JwtBootstrapMiddleware)
+        # 2️⃣ X‑Institution‑ID header
+        # 3️⃣ (optional) fallback to authenticated user’s institution
+        if hasattr(request, 'institution_id') and request.institution_id:
+            # already set by bootstrap
             pass
-        elif hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
-            # Superusuario: el header prevalece, no validamos contra token
-            if header_institution:
-                request.institution_id = int(header_institution)
-            elif token_institution:
-                request.institution_id = token_institution
-        else:
-            # Usuario normal: el header debe coincidir con el token
-            if header_institution and token_institution:
-                if str(header_institution) != str(token_institution):
-                    from django.http import HttpResponseForbidden
-                    return HttpResponseForbidden("Tenant mismatch")
-                request.institution_id = int(header_institution)
-            elif token_institution:
-                request.institution_id = token_institution
-            elif header_institution:
-                request.institution_id = int(header_institution)
+        elif header_institution:
+            request.institution_id = int(header_institution)
+
+        # else: no institution_id -> tenant will remain None
 
         # Asignar tenant object para RLS basado en institution_id
         if hasattr(request, 'institution_id') and request.institution_id:
@@ -72,9 +63,6 @@ class TenantMiddleware:
             except Institution.DoesNotExist:
                 pass
         
-        if not tenant and hasattr(request.user, 'institution'):
-            tenant = request.user.institution
-            
         request.tenant = tenant
             
         # HARDENING: Inyectar ID en la sesión de base de datos y ThreadLocal
@@ -108,11 +96,10 @@ class TenantMiddleware:
 
             set_current_tenant_id(tenant.id)
             with connection.cursor() as cursor:
-                cursor.execute(f"SET app.current_tenant = '{tenant.id}';")
+                cursor.execute("SET app.current_tenant = %s", [str(tenant.id)])
         else:
-            set_current_tenant_id(0) # Contexto bloqueado
-            with connection.cursor() as cursor:
-                cursor.execute("SET app.current_tenant = '0';")
+            # No tenant válido, limpiamos contexto sin forzar ID 0
+            clear_current_tenant()
 
         try:
             response = self.get_response(request)

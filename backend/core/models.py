@@ -1,7 +1,8 @@
 from django.db import models
+from django.contrib.auth.base_user import BaseUserManager
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-import json
+from django.contrib.auth.models import UserManager
 
 from core.thread_context import get_current_tenant_id
 
@@ -22,7 +23,7 @@ class TenantQuerySet(models.QuerySet):
             return self.none()
         return self.filter(institution_id=user.institution_id)
 
-class TenantManager(models.Manager):
+class TenantManager(BaseUserManager, models.Manager):
     """
     Manager que obliga al aislamiento activo.
     get_queryset() filtra automáticamente basándose en el contexto del hilo (ThreadLocal).
@@ -45,6 +46,25 @@ class TenantManager(models.Manager):
     def get_by_natural_key(self, username):
         # Necesario para el sistema de autenticación de Django
         return self.get_queryset().get(**{self.model.USERNAME_FIELD: username})
+
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        """Create and return a superuser with the given username, email and password.
+        Validates that the supplied role is among the User model's Role choices.
+        """
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('role', 'GLOBAL')
+        # Validate role against User.Role TextChoices (if the model defines them)
+        role_value = extra_fields.get('role')
+        if hasattr(self.model, 'Role'):
+            valid_roles = [choice.value for choice in self.model.Role]
+            if role_value not in valid_roles:
+                raise ValueError(f"Invalid role '{role_value}' for superuser. Valid roles: {valid_roles}")
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('Superuser must have is_staff=True.')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
+        return self.create_user(username, email=email, password=password, **extra_fields)
 
     def for_tenant(self, institution_id):
         return self.get_queryset().for_tenant(institution_id)

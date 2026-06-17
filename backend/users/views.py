@@ -19,7 +19,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Add custom claims
         token['role'] = user.role
         token['username'] = user.username
-        token['institution'] = user.institution.id if user.institution else None
+        token['institution_id'] = user.institution.id if user.institution else None
         token['wizard_completed'] = user.institution.wizard_completed if user.institution else True
         return token
 

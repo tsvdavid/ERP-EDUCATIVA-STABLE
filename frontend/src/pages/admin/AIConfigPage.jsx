@@ -33,7 +33,7 @@ function AIConfigPage() {
             name: 'Local / Custom (Ollama)', 
             defaultModel: 'llama3',
             fields: [
-                { key: 'api_base_url', label: 'API Base URL (ej: http://localhost:11434/v1)', type: 'text' },
+                { key: 'api_base_url', label: 'API Base URL (ej: /api/v1)', type: 'text' },
                 { key: 'api_key', label: 'API Key (Opcional)', type: 'password' },
                 { key: 'model_name', label: 'Modelo (ej: llama3)', type: 'text' }
             ]
@@ -53,7 +53,7 @@ function AIConfigPage() {
                 if (found) {
                     return { ...p, ...found, api_key: '' }; // No mostramos la clave anterior por seguridad
                 }
-                return { ...p, is_active: false, api_key: '', model_name: p.defaultModel, api_base_url: p.id === 'local' ? 'http://localhost:11434/v1' : '' };
+                return { ...p, is_active: false, api_key: '', model_name: p.defaultModel, api_base_url: p.id === 'local' ? '/api/v1' : '' };
             });
             setConfigs(merged);
         } catch (err) {

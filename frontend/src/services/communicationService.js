@@ -104,7 +104,6 @@ const communicationService = {
         const response = await api.delete(`/communication/holidays/${id}/`);
         return response.data;
     }
-
 };
 
 export default communicationService;

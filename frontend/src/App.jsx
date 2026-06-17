@@ -132,22 +132,41 @@ class ErrorBoundary extends React.Component {
 
 const SetupGuard = ({ children }) => {
   const { isAuthenticated, user } = useAuthStore();
-  if (isAuthenticated && user && !user.wizard_completed && 
-      ['ADMIN', 'RECTOR', 'LOCAL_ADMIN'].includes(user.role) && 
-      !window.location.pathname.includes('/setup-wizard')) {
+
+  if (
+    isAuthenticated &&
+    user &&
+    !user.wizard_completed &&
+    user.role !== 'ADMIN' &&
+    !user.is_superuser &&
+    !window.location.pathname.includes('/setup-wizard')
+  ) {
     return <Navigate to="/setup-wizard" replace />;
   }
+
   return children;
 };
 
 const RoleGuard = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, isLoading } = useAuthStore();
-  if (isLoading) return <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-bold">Cargando...</div>;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-900 text-white font-bold">
+        Cargando...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
     console.warn(`Access denied for role ${user?.role}. Allowed: ${allowedRoles}`);
     return <Navigate to="/dashboard" replace />;
   }
+
   return children;
 };
 

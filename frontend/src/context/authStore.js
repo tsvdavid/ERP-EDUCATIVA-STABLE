@@ -20,9 +20,14 @@ export const useAuthStore = create((set) => ({
 
             set({
                 isAuthenticated: true,
-                user: { username, ...decoded },
+                user: {
+                    ...decoded,
+                    username,
+                    role: decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role,
+                    is_superuser: decoded.role === 'GLOBAL'
+                },
                 isLoading: false,
-                activeInstitution: decoded.institution // Set from token
+                activeInstitution: decoded.institution_id // Set from token
             });
             // Also save to localStorage for persistence
             if (decoded.institution) {
@@ -44,9 +49,13 @@ export const useAuthStore = create((set) => ({
             localStorage.setItem('access_token', access);
             const decoded = jwtDecode(access);
             set({
-                user: decoded,
+                user: {
+                    ...decoded,
+                    role: decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role,
+                    is_superuser: decoded.role === 'GLOBAL'
+                },
                 isAuthenticated: true,
-                activeInstitution: localStorage.getItem('active_institution') || decoded.institution
+                activeInstitution: localStorage.getItem('active_institution') || decoded.institution_id
             });
             return true;
         } catch (error) {
@@ -88,11 +97,20 @@ export const useAuthStore = create((set) => ({
                 } else {
                     // prioritize localStorage, but fallback to token
                     let activeInst = localStorage.getItem('active_institution');
-                    if (!activeInst && decoded.institution) {
-                        activeInst = decoded.institution;
+                    if (!activeInst && decoded.institution_id) {
+                        activeInst = decoded.institution_id;
                         localStorage.setItem('active_institution', activeInst);
                     }
-                    set({ user: decoded, isAuthenticated: true, isLoading: false, activeInstitution: activeInst });
+                    set({
+                        user: {
+                            ...decoded,
+                            role: decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role,
+                            is_superuser: decoded.role === 'GLOBAL'
+                        },
+                        isAuthenticated: true,
+                        isLoading: false,
+                        activeInstitution: activeInst
+                    });
                 }
             } catch (e) {
                 set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null });
@@ -115,3 +133,9 @@ export const useAuthStore = create((set) => ({
         set({ activeInstitution: id });
     }
 }));
+
+if (typeof window !== 'undefined') {
+    window.authDebug = () => {
+        console.log('AUTH STATE:', useAuthStore.getState());
+    };
+}

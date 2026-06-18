@@ -34,3 +34,5 @@ backups/
 backend/media/reports_temp/
 backend/reports/
 backend/static/
+*.sql
+*.sha256

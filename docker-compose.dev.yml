@@ -7,6 +7,12 @@ services:
       POSTGRES_PASSWORD: postgrespw
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
     volumes:
       - db_data:/var/lib/postgresql/data
 
@@ -14,6 +20,11 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   backend:
     build: ./backend
@@ -21,9 +32,18 @@ services:
     volumes:
       - ./backend:/app
     ports:
-      - "8000:8000"
+       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ./backend/.env
 
@@ -40,9 +60,17 @@ services:
       - VITE_API_URL_PROXY=http://backend:8000
       - API_PROXY_TARGET=http://backend:8000
     command: npm run dev -- --host 0.0.0.0 --port 5174
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5174"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
 
   tunnel:
-    image: cloudflare/cloudflared:latest
+    depends_on:
+      frontend:
+        condition: service_healthy
     restart: unless-stopped
     command: tunnel run
     environment:

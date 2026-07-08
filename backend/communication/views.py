@@ -16,27 +16,48 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return Message.objects.none()
         queryset = Message.objects.filter(Q(recipient=user) | Q(sender=user))
-        
-        # Security: Enforce Institution (though messages are user-to-user, users are in institution)
-        # Assuming users can only message within their institution (or global?)
-        # For now, rely on user visibility restrictions (UserViewSet) to prevent messaging cross-institution users.
-        return queryset
+        return queryset.filter(sender__institution=tenant, recipient__institution=tenant)
 
     def perform_create(self, serializer):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError("No se pudo determinar el tenant activo.")
+        recipient = serializer.validated_data.get('recipient')
+        if recipient and recipient.institution_id != tenant.id:
+            raise PermissionDenied("No puedes enviar mensajes fuera de tu institución activa.")
         serializer.save(sender=self.request.user)
 
     @action(detail=False, methods=['get'])
     def inbox(self, request):
         """Mensajes recibidos"""
-        messages = Message.objects.filter(recipient=request.user, parent=None).order_by('-created_at')
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response([])
+        messages = Message.objects.filter(
+            recipient=request.user,
+            parent=None,
+            sender__institution=tenant,
+            recipient__institution=tenant,
+        ).order_by('-created_at')
         serializer = self.get_serializer(messages, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def sent(self, request):
         """Mensajes enviados"""
-        messages = Message.objects.filter(sender=request.user, parent=None).order_by('-created_at')
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response([])
+        messages = Message.objects.filter(
+            sender=request.user,
+            parent=None,
+            sender__institution=tenant,
+            recipient__institution=tenant,
+        ).order_by('-created_at')
         serializer = self.get_serializer(messages, many=True)
         return Response(serializer.data)
 
@@ -46,7 +67,13 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Notifications are strictly per user, so they are implicitly isolated.
-        return Notification.objects.filter(user=self.request.user).order_by('-created_at')
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return Notification.objects.none()
+        return Notification.objects.filter(
+            user=self.request.user,
+            user__institution=tenant,
+        ).order_by('-created_at')
 
     @action(detail=True, methods=['post'])
     def mark_read(self, request, pk=None):
@@ -62,13 +89,13 @@ class NoticeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = Notice.objects.all()
-        
-        # 0. Strict Institution Filter
-        if user.institution:
-             # Filter based on author's institution OR target course's institution
-             # Best: Filter where author is in the same institution
-             queryset = queryset.filter(Q(author__institution=user.institution) | Q(author__institution__isnull=True))
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return Notice.objects.none()
+
+        queryset = Notice.objects.filter(
+            Q(author__institution=tenant) | Q(target_course__institution=tenant)
+        ).distinct()
              
         if user.role == 'ADMIN' or user.role == 'RECTOR':
              return queryset.order_by('-created_at')
@@ -124,10 +151,15 @@ class NoticeViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         try:
             user = self.request.user
+            tenant = getattr(self.request, 'tenant', None)
+            if not tenant:
+                raise ValidationError("No se pudo determinar el tenant activo.")
             # Validation
             if user.role == 'TEACHER':
                 target_course = serializer.validated_data.get('target_course')
                 if target_course:
+                     if target_course.institution_id != tenant.id:
+                         raise PermissionDenied("El curso objetivo no pertenece al tenant activo.")
                      # Check if teacher teaches any subject in this course
                      from academic.models import Subject
                      if not Subject.objects.filter(course=target_course, teacher=user).exists():
@@ -137,6 +169,12 @@ class NoticeViewSet(viewsets.ModelViewSet):
                 if target_role == 'ALL' or target_role == 'PARENT':
                        if not target_course and not serializer.validated_data.get('target_students'):
                            pass 
+
+            target_students = serializer.validated_data.get('target_students')
+            if target_students is not None:
+                for student in target_students:
+                    if student.institution_id != tenant.id:
+                        raise PermissionDenied("Hay estudiantes fuera del tenant activo en el targeting.")
 
             notice = serializer.save(author=user)
             
@@ -189,7 +227,7 @@ class NoticeViewSet(viewsets.ModelViewSet):
                 # OR if the user expects all students to see it in red... we need to create it for them.
                 # Let's assume moderate usage and create for targets.
                 
-                target_users = User.objects.filter(q).distinct()
+                target_users = User.objects.filter(q, institution=tenant).distinct()
                 notifications_to_create = [
                     Notification(
                         user=u,
@@ -217,7 +255,7 @@ class HolidayViewSet(viewsets.ModelViewSet):
         return [IsLocalAdminUser()] # Changed from permissions.IsAdminUser()
     
     def get_queryset(self):
-         # Allow all authenticated users to view
+            # Los feriados son datos globales no sensibles.
          return Holiday.objects.all().order_by('date')
 
     @action(detail=False, methods=['post'], permission_classes=[IsLocalAdminUser]) # Changed from permissions.IsAdminUser

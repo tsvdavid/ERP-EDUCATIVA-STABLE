@@ -95,6 +95,7 @@ class User(AbstractUser):
     )
     
     objects = TenantUserManager()
+    all_objects = models.Manager()
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
     birth_date = models.DateField(null=True, blank=True)

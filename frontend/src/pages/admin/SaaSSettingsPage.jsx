@@ -8,8 +8,10 @@ const SaaSSettingsPage = () => {
         default_trial_days: 30,
         grace_period_days: 5,
         auto_suspend: true,
-        reminder_days: [30, 15, 7, 3, 1]
+        reminder_days: [30, 15, 7, 3, 1],
+        default_plan: ''
     });
+    const [activePlans, setActivePlans] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,8 +21,15 @@ const SaaSSettingsPage = () => {
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const data = await subscriptionService.getGlobalSettings();
-            setSettings(data);
+            const [data, plans] = await Promise.all([
+                subscriptionService.getGlobalSettings(),
+                subscriptionService.getPlans()
+            ]);
+            setSettings({
+                ...data,
+                default_plan: data.default_plan || ''
+            });
+            setActivePlans((plans || []).filter(plan => plan.is_active));
         } catch (error) {
             toast.error("Error al cargar configuración global.");
         } finally {
@@ -30,7 +39,11 @@ const SaaSSettingsPage = () => {
 
     const handleSave = async () => {
         try {
-            await subscriptionService.updateGlobalSettings(settings);
+            const payload = {
+                ...settings,
+                default_plan: settings.default_plan || null
+            };
+            await subscriptionService.updateGlobalSettings(payload);
             toast.success("Configuración SaaS actualizada correctamente.");
         } catch (error) {
             toast.error("Error al guardar cambios.");
@@ -69,6 +82,19 @@ const SaaSSettingsPage = () => {
                                 type="number" className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-700"
                                 value={settings.default_trial_days} onChange={e => setSettings({...settings, default_trial_days: parseInt(e.target.value)})}
                             />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Plan predeterminado para nuevas instituciones</label>
+                            <select
+                                className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-700"
+                                value={settings.default_plan || ''}
+                                onChange={e => setSettings({ ...settings, default_plan: e.target.value ? parseInt(e.target.value) : '' })}
+                            >
+                                <option value="">Sin plan predeterminado</option>
+                                {activePlans.map(plan => (
+                                    <option key={plan.id} value={plan.id}>{plan.name}</option>
+                                ))}
+                            </select>
                         </div>
                         <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl">
                             <input 

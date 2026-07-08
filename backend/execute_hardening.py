@@ -1,5 +1,6 @@
 import os
 import django
+from pathlib import Path
 from django.db import connection
 
 # Setup Django environment
@@ -7,8 +8,8 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
 def run_hardening():
-    sql_path = '/var/www/erpeducativa/ERP-EDUCATIVA/backend/apply_hardening_rls.sql'
-    if not os.path.exists(sql_path):
+    sql_path = Path(__file__).resolve().parent / 'apply_robust_rls_v3.sql'
+    if not sql_path.exists():
         print(f"Error: {sql_path} not found")
         return
 

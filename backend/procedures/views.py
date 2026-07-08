@@ -15,7 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from django.core.files.base import ContentFile
 
 class ProcedureTemplateViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = ProcedureTemplate.objects.all()
+    queryset = ProcedureTemplate.objects.unscoped()
     serializer_class = ProcedureTemplateSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -25,7 +25,7 @@ class ProcedureTemplateViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
 
 class StudentRequestViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = StudentRequest.objects.all()
+    queryset = StudentRequest.objects.unscoped()
     serializer_class = StudentRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -46,7 +46,8 @@ class StudentRequestViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            student=self.request.user  # The student making the request
+            student=self.request.user,  # The student making the request
+            institution=self.request.tenant,
         )
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser]) # Update this based on your roles later

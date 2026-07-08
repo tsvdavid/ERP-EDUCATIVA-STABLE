@@ -1,3 +1,3 @@
-from django.test import TestCase
-
-# Create your tests here.
+# Cleaned test module – no unused imports
+# The Helpdesk smoke test resides in tests/test_smoke.py
+# This file intentionally left minimal.

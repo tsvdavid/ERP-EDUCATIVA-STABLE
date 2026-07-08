@@ -238,6 +238,7 @@ function App() {
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="academic/reports" element={<AcademicReportsPage />} />
               <Route path="academic/global-reports" element={<GlobalReportsPage />} />
+              <Route path="academic/schedules-manager" element={<RoleGuard allowedRoles={['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER']}><CourseScheduleManager /></RoleGuard>} />
               <Route path="institution" element={<InstitutionPage />} />
               <Route path="admin/institutions" element={<InstitutionsManagementPage />} />
               <Route path="admin/institutions/new" element={<InstitutionPage />} />

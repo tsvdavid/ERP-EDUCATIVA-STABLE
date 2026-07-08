@@ -9,16 +9,19 @@ class PaymentConceptSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentConcept
         fields = '__all__'
+        read_only_fields = ['institution']
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentMethod
         fields = '__all__'
+        read_only_fields = ['institution']
 
 class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = '__all__'
+        read_only_fields = ['institution']
 
 class InvoiceDetailSerializer(serializers.ModelSerializer):
     concept_name = serializers.CharField(source='concept.name', read_only=True)
@@ -26,6 +29,7 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = InvoiceDetail
         fields = ('id', 'concept', 'concept_name', 'quantity', 'unit_price', 'subtotal')
+        read_only_fields = ['institution']
 
 class InvoiceSerializer(serializers.ModelSerializer):
     customer_details = CustomerSerializer(source='customer', read_only=True)
@@ -42,9 +46,9 @@ class InvoiceSerializer(serializers.ModelSerializer):
         super(InvoiceSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+            tenant = request.tenant
             if 'customer' in self.fields:
-                self.fields['customer'].queryset = Customer.objects.filter(institution_id=inst_id)
+                self.fields['customer'].queryset = Customer.objects.filter(institution=tenant)
 
     def get_was_sent(self, obj):
         return obj.email_status == 'SENT'
@@ -67,14 +71,14 @@ class ChargeSerializer(serializers.ModelSerializer):
         super(ChargeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+            tenant = request.tenant
             if 'customer' in self.fields:
-                self.fields['customer'].queryset = Customer.objects.filter(institution_id=inst_id)
+                self.fields['customer'].queryset = Customer.objects.filter(institution=tenant)
             if 'student' in self.fields:
                 from users.models import User
-                self.fields['student'].queryset = User.objects.filter(institution_id=inst_id, role='STUDENT')
+                self.fields['student'].queryset = User.objects.filter(institution=tenant, role='STUDENT')
             if 'concept' in self.fields:
-                self.fields['concept'].queryset = PaymentConcept.objects.filter(institution_id=inst_id)
+                self.fields['concept'].queryset = PaymentConcept.objects.filter(institution=tenant)
 
 class CreateInvoiceSerializer(serializers.Serializer):
     student_id = serializers.IntegerField(required=False, allow_null=True)
@@ -108,9 +112,9 @@ class CreditNoteSerializer(serializers.ModelSerializer):
         super(CreditNoteSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+            tenant = request.tenant
             if 'invoice' in self.fields:
-                self.fields['invoice'].queryset = Invoice.objects.filter(institution_id=inst_id)
+                self.fields['invoice'].queryset = Invoice.objects.filter(institution=tenant)
 
 class DebitNoteSerializer(serializers.ModelSerializer):
     invoice_number = serializers.CharField(source='invoice.number', read_only=True)
@@ -124,9 +128,9 @@ class DebitNoteSerializer(serializers.ModelSerializer):
         super(DebitNoteSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
         if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+            tenant = request.tenant
             if 'invoice' in self.fields:
-                self.fields['invoice'].queryset = Invoice.objects.filter(institution_id=inst_id)
+                self.fields['invoice'].queryset = Invoice.objects.filter(institution=tenant)
 
 
 class EmailLogSerializer(serializers.ModelSerializer):

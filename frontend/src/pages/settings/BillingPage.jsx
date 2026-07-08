@@ -37,9 +37,20 @@ const BillingPage = () => {
         );
     }
 
-    const isSuspended = info.status === 'SUSPENDED';
-    const isGrace = info.status === 'GRACE';
-    const isExpiring = info.status === 'EXPIRING';
+    // Guard against missing info (e.g., API error 400)
+    if (!info) {
+        return (
+            <div className="p-8 max-w-2xl mx-auto bg-white rounded-xl border border-slate-200 text-center">
+                <AlertTriangle size={48} className="mx-auto text-rose-300 mb-4" />
+                <h2 className="text-xl font-bold text-slate-800 mb-2">Error de facturación</h2>
+                <p className="text-slate-500">No se pudo cargar la información de facturación. Por favor contacte al soporte.</p>
+            </div>
+        );
+    }
+
+    const isSuspended = info?.status === 'SUSPENDED';
+    const isGrace = info?.status === 'GRACE';
+    const isExpiring = info?.status === 'EXPIRING';
 
     return (
         <div className="space-y-6 max-w-4xl mx-auto">

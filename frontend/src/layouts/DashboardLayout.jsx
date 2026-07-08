@@ -5,6 +5,7 @@ import userService from '../services/userService';
 import { useSocket } from '../context/SocketContext';
 import communicationService from '../services/communicationService';
 import { Toaster, toast } from 'react-hot-toast';
+import { isModuleVisibleForUser, resolveModuleCodeForPath } from '../config/moduleVisibilityCatalog';
 import {
     LogOut,
     LayoutDashboard,
@@ -53,7 +54,7 @@ import {
 import logoEduka360 from '../assets/logo-eduka360.jpg';
 
 const DashboardLayout = () => {
-    const { logout, user, activeInstitution, setActiveInstitution } = useAuthStore();
+    const { logout, user, activeInstitution, setActiveInstitution, availableModules } = useAuthStore();
     const navigate = useNavigate();
     const location = useLocation();
     const { lastMessage } = useSocket();
@@ -81,11 +82,42 @@ const DashboardLayout = () => {
         }
     }, [user]);
 
-    const handleInstitutionChange = (e) => {
+    const handleInstitutionChange = async (e) => {
         const value = e.target.value;
         const newInst = value === "" ? null : value;
-        setActiveInstitution(newInst);
-        window.location.reload(); // Force reload to Apply Header Context
+
+        if (!newInst) {
+            setActiveInstitution(null);
+            window.location.reload();
+            return;
+        }
+
+        try {
+            const refreshToken = localStorage.getItem('refresh_token');
+            const response = await fetch('/api/users/token/switch/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    refresh_token: refreshToken,
+                    institution_id: Number(newInst)
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || 'No fue posible cambiar de institución');
+            }
+
+            useAuthStore.getState().applyAuthTokens({
+                access: data.access,
+                refresh: data.refresh,
+            });
+            setActiveInstitution(String(data.institution_id));
+            window.location.reload();
+        } catch (error) {
+            console.error('Error al cambiar institución', error);
+            window.location.reload();
+        }
     };
 
     useEffect(() => {
@@ -127,7 +159,7 @@ const DashboardLayout = () => {
         { section: 'Principal', path: '/dashboard/teachers', label: 'Profesores', icon: UserCheck, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'] },
 
         // Académico
-        { section: 'Académico', path: '/dashboard/academic-years', label: 'Año Lectivo', icon: Calendar, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'] },
+        { section: 'Académico', path: '/dashboard/academic-year', label: 'Año Lectivo', icon: Calendar, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR'] },
         { section: 'Académico', path: '/dashboard/courses', label: 'Cursos', icon: GraduationCap, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT'] },
         { section: 'Académico', path: '/dashboard/subjects', label: 'Materias', icon: BookOpen, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER'] },
         { section: 'Académico', path: '/dashboard/students', label: 'Estudiantes', icon: Users, roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'ACCOUNTANT'] },
@@ -227,32 +259,80 @@ const DashboardLayout = () => {
         { section: 'Administrativo', path: '/dashboard/settings/billing', label: 'Mi Facturación', icon: Landmark, roles: ['LOCAL_ADMIN', 'RECTOR', 'ADMIN'] },
     ], []);
 
-    const groupedNavItems = React.useMemo(() => {
-        const filtered = navItems.filter(item => {
-            if (!user) return false;
-            
-            // Check role permission
-            const hasRole = item.roles.includes(user.role);
-            if (!hasRole) return false;
-
-            // Check if it's a dev module
-            if (item.isDev) {
-                return user.role === 'GLOBAL' || user.is_superuser;
-            }
-
-            return true;
-        });
-
-        return filtered.reduce((acc, item) => {
+    const { groupedNavItems, sidebarAudit } = React.useMemo(() => {
+        const sectionMap = navItems.reduce((acc, item) => {
             const section = item.section || 'General';
             if (!acc[section]) acc[section] = [];
             acc[section].push(item);
             return acc;
         }, {});
-    }, [user, navItems]);
+
+        if (!user) {
+            return {
+                groupedNavItems: {},
+                sidebarAudit: {
+                    modulesReceived: availableModules || [],
+                    modulesVisible: [],
+                    sections: Object.keys(sectionMap).map((section) => ({
+                        section,
+                        visible: false,
+                        reason: 'Sin usuario autenticado',
+                        visibleChildren: [],
+                    })),
+                },
+            };
+        }
+
+        const grouped = {};
+        const sectionAudit = [];
+        const visibleModuleCodes = new Set();
+
+        Object.entries(sectionMap).forEach(([section, children]) => {
+            const visibleChildren = children.filter((item) => {
+                const hasRole = item.roles.includes(user.role);
+                if (!hasRole) return false;
+
+                if (item.isDev) {
+                    return user.role === 'GLOBAL' || user.is_superuser;
+                }
+
+                const moduleCode = item.moduleCode || resolveModuleCodeForPath(item.path);
+                const isVisible = isModuleVisibleForUser({ user, availableModules, moduleCode });
+                if (isVisible && moduleCode) {
+                    visibleModuleCodes.add(moduleCode);
+                }
+                return isVisible;
+            });
+
+            if (visibleChildren.length > 0) {
+                grouped[section] = visibleChildren;
+            }
+
+            sectionAudit.push({
+                section,
+                visible: visibleChildren.length > 0,
+                reason: visibleChildren.length > 0
+                    ? 'Tiene hijos visibles tras filtro por rol y módulos habilitados'
+                    : 'Sin hijos visibles tras filtro por institution.enabled_modules y rol',
+                visibleChildren: visibleChildren.map((item) => item.label),
+            });
+        });
+
+        return {
+            groupedNavItems: grouped,
+            sidebarAudit: {
+                modulesReceived: availableModules || [],
+                modulesVisible: [...visibleModuleCodes],
+                sections: sectionAudit,
+            },
+        };
+    }, [user, navItems, availableModules]);
         console.log('===== MENU DEBUG =====');
         console.log('USER FROM DASHBOARD:', user);
         console.log('ROLE:', user?.role);
+        console.log('MODULES RECEIVED:', sidebarAudit.modulesReceived);
+        console.log('MODULES VISIBLE:', sidebarAudit.modulesVisible);
+        console.log('SECTIONS AUDIT:', sidebarAudit.sections);
         console.log('GROUPED ITEMS:', groupedNavItems);
         console.log('NAV TOTAL:', navItems.length);
         console.log('SIDEBAR STATE:', isSidebarOpen);

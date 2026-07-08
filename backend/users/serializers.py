@@ -65,10 +65,11 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(UserCreateSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
-            if 'institution' in self.fields:
-                self.fields['institution'].queryset = Institution.objects.filter(id=inst_id)
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
+            if tenant:
+                self.fields['institution'].queryset = Institution.objects.filter(id=tenant.id)
+
     
     def validate(self, data):
         request = self.context.get('request')

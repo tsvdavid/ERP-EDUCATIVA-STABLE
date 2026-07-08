@@ -26,15 +26,14 @@ from .serializers import (
 from users.permissions import IsAcademicStaff, IsAdminUser, IsLocalAdminUser, IsTreasuryStaff
 from users.models import User
 from users.tenant_mixins import InstitutionFilterMixin
+from core.tenancy.viewsets import BaseTenantViewSet
 
 
-class AcademicYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = AcademicYear.objects.all()
+class AcademicYearViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = AcademicYear.objects.unscoped()
     serializer_class = AcademicYearSerializer
     tenant_field = 'institution'
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+    # Creation handled by BaseTenantViewSet using request.tenant
     
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy', 'set_active']:
@@ -55,26 +54,22 @@ class AcademicYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         
         return Response({'status': 'Año lectivo activado exitosamente'})
 
-class AcademicPeriodViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = AcademicPeriod.objects.all()
+class AcademicPeriodViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = AcademicPeriod.objects.unscoped()
     serializer_class = AcademicPeriodSerializer
     tenant_field = 'institution'
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+    # Creation handled by BaseTenantViewSet using request.tenant
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [permissions.IsAuthenticated(), (IsLocalAdminUser | IsLocalAdminUser)()]
         return [permissions.IsAuthenticated()]
 
-class CourseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Course.objects.all().select_related('institution')
+class CourseViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Course.objects.unscoped().select_related('institution')
     serializer_class = CourseSerializer
     tenant_field = 'institution'
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+    # Creation handled by BaseTenantViewSet using request.tenant
     
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
@@ -118,12 +113,12 @@ class CourseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
         return queryset
 
-class EvaluationCategoryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = EvaluationCategory.objects.all()
+class EvaluationCategoryViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = EvaluationCategory.objects.unscoped()
     serializer_class = EvaluationCategorySerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_lookup = 'subject__course__institution'
-    tenant_field = None # No direct institution field
+    tenant_field = None  # No direct institution field
 
     def perform_create(self, serializer):
         # Determine institution from related subject
@@ -142,8 +137,8 @@ class EvaluationCategoryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             
         return queryset
 
-class SubjectViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Subject.objects.all().select_related('course', 'course__institution', 'teacher')
+class SubjectViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Subject.objects.unscoped().select_related('course', 'course__institution', 'teacher')
     serializer_class = SubjectSerializer
     tenant_lookup = 'course__institution'
     tenant_field = None
@@ -186,9 +181,9 @@ class SubjectViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
         return queryset
 
-class EnrollmentViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+class EnrollmentViewSet(InstitutionFilterMixin, BaseTenantViewSet):
     # Optimize for calculate_averages() and serializers
-    queryset = Enrollment.objects.all().select_related(
+    queryset = Enrollment.objects.unscoped().select_related(
         'student', 
         'course', 
         'course__institution'
@@ -280,7 +275,7 @@ class EnrollmentViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         # Check if student is already enrolled in ANY course
         if Enrollment.objects.filter(student=student).exists():
             raise ValidationError("El estudiante ya está matriculado en un curso. Elimine la matrícula anterior para cambiarlo.")
-        serializer.save()
+        serializer.save(institution=self.request.tenant)
 
     @action(detail=False, methods=['get'], url_path='excellence-ranking')
     def excellence_ranking(self, request):
@@ -564,7 +559,8 @@ class EnrollmentViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
                 
             return HttpResponse(f"Error generando PDF: {e}", status=500)
 
-class GradeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+class GradeViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Grade.objects.unscoped()
     serializer_class = GradeSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_lookup = 'enrollment__course__institution'
@@ -622,12 +618,12 @@ class GradeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self._validate_year_period_open(serializer.validated_data)
-        grade = serializer.save()
+        grade = serializer.save(institution=self.request.tenant)
         self._check_low_grade_alert(grade)
 
     def perform_update(self, serializer):
         self._validate_year_period_open(serializer.validated_data)
-        grade = serializer.save()
+        grade = serializer.save(institution=self.request.tenant)
         self._check_low_grade_alert(grade)
 
     def get_queryset(self):
@@ -766,7 +762,8 @@ class GradeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             "risk_students": sorted(risk_students, key=lambda x: x['score'])
         })
 
-class AttendanceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
+class AttendanceViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Attendance.objects.unscoped()
     serializer_class = AttendanceSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_lookup = 'enrollment__course__institution'
@@ -774,6 +771,7 @@ class AttendanceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         enrollment = serializer.validated_data.get('enrollment')
+        # Ensure tenant isolation; institution derived from enrollment's course (already tenant-protected)
         serializer.save(institution=enrollment.course.institution)
 
     def get_queryset(self):
@@ -914,7 +912,7 @@ class AttendanceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         })
 
 class ClassScheduleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = ClassSchedule.objects.all()
+    queryset = ClassSchedule.objects.unscoped()
     serializer_class = ClassScheduleSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_lookup = 'subject__course__institution'
@@ -926,7 +924,7 @@ class ClassScheduleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         serializer.save(institution=subject.course.institution)
 
     def get_queryset(self):
-        queryset = ClassSchedule.objects.all()
+        queryset = ClassSchedule.objects.unscoped()
         user = self.request.user
         
         if user.role == 'STUDENT':
@@ -949,7 +947,7 @@ class ClassScheduleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return queryset
 
 class ObservationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Observation.objects.all().select_related('student', 'teacher')
+    queryset = Observation.objects.unscoped().select_related('student', 'teacher')
     serializer_class = ObservationSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -986,11 +984,8 @@ class ObservationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        # Auto-set teacher and institution to current context
-        observation = serializer.save(
-            teacher=self.request.user,
-            institution=self.request.user.institution
-        )
+        # Auto-set teacher; institution handled by BaseTenantViewSet
+        serializer.save(teacher=self.request.user)
         
         # Automatic alert system for HIGH criticality or NEGATIVE types
         if observation.criticality == 'HIGH' or observation.type in ['BEHAVIORAL', 'SOCIOEMOTIONAL']:

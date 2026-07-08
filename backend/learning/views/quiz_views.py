@@ -5,23 +5,31 @@ from rest_framework.response import Response
 from django.utils import timezone
 from ..models import Quiz, Question, Choice, QuizAttempt, AnswerSubmission
 from ..serializers import QuizSerializer, QuestionSerializer, ChoiceSerializer, QuizAttemptSerializer, AnswerSubmissionSerializer
+from users.tenant_mixins import InstitutionFilterMixin
 
-class QuizViewSet(viewsets.ModelViewSet):
+class QuizViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Quiz.objects.all()
     serializer_class = QuizSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'module__course__institution'
 
-class QuestionViewSet(viewsets.ModelViewSet):
+class QuestionViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'quiz__module__course__institution'
 
-class ChoiceViewSet(viewsets.ModelViewSet):
+class ChoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Choice.objects.all()
     serializer_class = ChoiceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'question__quiz__module__course__institution'
 
-class QuizAttemptViewSet(viewsets.ModelViewSet):
+class QuizAttemptViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = QuizAttempt.objects.all()
     serializer_class = QuizAttemptSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'quiz__module__course__institution'
 
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)

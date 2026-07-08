@@ -18,7 +18,19 @@ class TenantUserManager(UserManager):
             if hasattr(self.model, 'is_superuser'):
                 return qs.filter(Q(institution_id=tenant_id) | Q(is_superuser=True))
             return qs.filter(institution_id=tenant_id)
-        return qs
+        return qs.none()
+
+    def global_queryset(self):
+        return super().get_queryset()
+
+    def unscoped(self):
+        return self.global_queryset()
+
+    def get_by_natural_key(self, username):
+        tenant_id = get_current_tenant_id()
+        if tenant_id and tenant_id != 0:
+            return self.get_queryset().get(**{self.model.USERNAME_FIELD: username})
+        return self.global_queryset().get(**{self.model.USERNAME_FIELD: username})
 
     def create_superuser(self, username, email=None, password=None, **extra_fields):
         """Create a superuser with role validation.

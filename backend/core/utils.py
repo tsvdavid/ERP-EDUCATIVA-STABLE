@@ -6,14 +6,10 @@ def get_tenant_from_request(request):
     Helper to extract the current institution from the request.
     Priority:
     1. request.tenant (set by TenantMiddleware)
-    2. request.user.institution (fallback for non-middleware usage)
     """
     if hasattr(request, 'tenant') and request.tenant:
         return request.tenant
-    
-    if request.user.is_authenticated:
-        return getattr(request.user, 'institution', None)
-    
+
     return None
 
 def get_tenant_or_404(request):

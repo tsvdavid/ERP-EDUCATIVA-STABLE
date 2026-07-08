@@ -24,8 +24,8 @@ class CourseSerializer(serializers.ModelSerializer):
     modules = ModuleSerializer(many=True, read_only=True)
     instructor_name = serializers.CharField(source='instructor.get_full_name', read_only=True)
     enrollment_count = serializers.IntegerField(source='enrollments.count', read_only=True)
-    institution = serializers.PrimaryKeyRelatedField(queryset=Institution.objects.all(), default=1)
-    instructor = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(role='TEACHER'), default=1)
+    institution = serializers.PrimaryKeyRelatedField(read_only=True)
+    instructor = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(role='TEACHER'), required=False, allow_null=True)
     
     # Metadatos Académicos
     academic_course_id = serializers.IntegerField(source='subject.course.id', read_only=True)
@@ -38,11 +38,25 @@ class CourseSerializer(serializers.ModelSerializer):
     group_name = serializers.CharField(source='tag.group.name', read_only=True)
     tag_name = serializers.CharField(source='tag.name', read_only=True)
     tag_id = serializers.PrimaryKeyRelatedField(
-        queryset=CourseTag.objects.all(), 
+        queryset=CourseTag.objects.none(), 
         source='tag', 
         required=False, 
         allow_null=True
     )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) if request else None
+
+        if tenant:
+            fields['instructor'].queryset = User.objects.filter(role='TEACHER', institution=tenant)
+            fields['tag_id'].queryset = CourseTag.objects.filter(group__institution=tenant)
+        else:
+            fields['instructor'].queryset = User.objects.none()
+            fields['tag_id'].queryset = CourseTag.objects.none()
+
+        return fields
     
     class Meta:
         model = LMSCourse

@@ -33,6 +33,6 @@ class JwtBootstrapMiddleware(MiddlewareMixin):
         # Expose raw payload for debugging if needed
         request.jwt_payload = token.payload
         request.user_id = token.get("user_id")
-        # ``institution`` claim is optional – SimpleJWT does not add it by default
-        request.institution_id = token.get("institution")
+        # ``institution`` / ``institution_id`` claims are optional, but should be present for multi-tenant requests.
+        request.institution_id = token.get("institution_id") or token.get("institution")
         return None

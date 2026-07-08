@@ -41,12 +41,12 @@ const subscriptionService = {
         const response = await api.post(`/subscriptions/admin/${id}/edit-dates/`, { next_billing_date });
         return response.data;
     },
-    updateModules: async (id, module_ids) => {
-        const response = await api.post(`/subscriptions/admin/${id}/update-modules/`, { module_ids });
-        return response.data;
-    },
     getModules: async () => {
         const response = await api.get('/subscriptions/admin/modules/');
+        return response.data;
+    },
+    getGlobalModulesCatalog: async () => {
+        const response = await api.get('/subscriptions/plans/modules-catalog/');
         return response.data;
     },
     getPlans: async () => {

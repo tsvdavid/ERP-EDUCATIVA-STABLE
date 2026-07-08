@@ -8,14 +8,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3)
-def send_invoice_email_task(self, invoice_id, recipient=None, sent_by_id=None, send_type='AUTO', **kwargs):
+def send_invoice_email_task(self, invoice_id, tenant_id: int, recipient=None, sent_by_id=None, send_type='AUTO', **kwargs):
+    if not tenant_id:
+        raise ValueError("tenant_id required")
     """
     Tarea robusta para enviar correos de facturas con reintentos y persistencia de estado.
     """
     from treasury.models import Invoice
     
     try:
-        invoice = Invoice.objects.select_related('institution').get(id=invoice_id)
+        invoice = Invoice.objects.select_related('institution').get(id=invoice_id, institution_id=tenant_id)
         
         # 1. Actualizar estado inicial en Invoice e intentos
         # Si es el primer intento (no es un retry de Celery), incrementamos contador
@@ -128,7 +130,7 @@ def send_invoice_email_task(self, invoice_id, recipient=None, sent_by_id=None, s
             delay = retry_delays[self.request.retries] if self.request.retries < len(retry_delays) else 1800
             
             try:
-                inv = Invoice.objects.get(id=invoice_id)
+                inv = Invoice.objects.get(id=invoice_id, institution_id=tenant_id)
                 inv.email_status = 'RETRYING'
                 inv.save()
             except: pass
@@ -137,7 +139,7 @@ def send_invoice_email_task(self, invoice_id, recipient=None, sent_by_id=None, s
         else:
             # Se agotaron los intentos
             try:
-                inv = Invoice.objects.get(id=invoice_id)
+                inv = Invoice.objects.get(id=invoice_id, institution_id=tenant_id)
                 inv.email_status = 'FAILED'
                 inv.save()
                 

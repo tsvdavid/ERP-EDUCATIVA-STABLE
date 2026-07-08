@@ -13,16 +13,34 @@ class TenantMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+    def _set_rls_mode(self, mode):
+        with connection.cursor() as cursor:
+            cursor.execute("SET app.rls_mode = %s", [mode])
+
+    def _set_tenant(self, tenant_id):
+        with connection.cursor() as cursor:
+            cursor.execute("SET app.current_tenant = %s", [str(tenant_id)])
+
+    def _reset_rls_context(self):
+        with connection.cursor() as cursor:
+            cursor.execute("RESET app.current_tenant;")
+            cursor.execute("RESET app.rls_mode;")
+
     def __call__(self, request):
         # ---------- Bypass total para rutas de autenticación ----------
         is_auth_route = request.path.startswith("/api/token/") or request.path.startswith(
             "/api/auth/"
         )
         if is_auth_route:
-            # No establecemos tenant ni RLS en login/registro
+            # Auth requiere acceso global controlado para login/refresh/switch.
             request.tenant = None
             clear_current_tenant()
-            return self.get_response(request)
+            self._set_rls_mode('global_admin')
+            try:
+                return self.get_response(request)
+            finally:
+                clear_current_tenant()
+                self._reset_rls_context()
 
         # ---------- JWT authentication sólo para rutas protegidas ----------
         # Authentication is handled by Django's AuthenticationMiddleware; no JWT processing here.
@@ -52,7 +70,10 @@ class TenantMiddleware:
             # already set by bootstrap
             pass
         elif header_institution:
-            request.institution_id = int(header_institution)
+            try:
+                request.institution_id = int(header_institution)
+            except (TypeError, ValueError):
+                request.institution_id = None
 
         # else: no institution_id -> tenant will remain None
 
@@ -95,11 +116,12 @@ class TenantMiddleware:
                     pass
 
             set_current_tenant_id(tenant.id)
-            with connection.cursor() as cursor:
-                cursor.execute("SET app.current_tenant = %s", [str(tenant.id)])
+            self._set_rls_mode('tenant')
+            self._set_tenant(tenant.id)
         else:
             # No tenant válido, limpiamos contexto sin forzar ID 0
             clear_current_tenant()
+            self._set_rls_mode('tenant')
 
         try:
             response = self.get_response(request)
@@ -111,7 +133,6 @@ class TenantMiddleware:
             raise e
         finally:
             clear_current_tenant()
-            with connection.cursor() as cursor:
-                cursor.execute("RESET app.current_tenant;")
+            self._reset_rls_context()
             
         return response

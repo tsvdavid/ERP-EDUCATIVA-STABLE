@@ -2,15 +2,21 @@ from django.db import models
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 from ..models import LMSCourse, LMSEnrollment
 from ..serializers import CourseSerializer, EnrollmentSerializer
 
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = LMSCourse.objects.all()
     serializer_class = CourseSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return self.queryset.none()
+
         queryset = self.queryset
         
         # Filtros por Query Params
@@ -25,11 +31,13 @@ class CourseViewSet(viewsets.ModelViewSet):
         if search_query:
             queryset = queryset.filter(models.Q(title__icontains=search_query) | models.Q(description__icontains=search_query))
 
+        queryset = queryset.filter(institution=tenant)
+
         if not user.is_authenticated:
-            return queryset.filter(is_public=True)
+            return queryset.none()
             
         if user.role == 'ADMIN':
-            return queryset.filter(institution=user.institution)
+            return queryset
             
         if user.role == 'TEACHER':
             return queryset.filter(
@@ -47,8 +55,11 @@ class CourseViewSet(viewsets.ModelViewSet):
         return queryset.filter(is_public=True)
 
     def perform_create(self, serializer):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No se pudo determinar el tenant activo.')
         serializer.save(
-            institution=self.request.user.institution,
+            institution=tenant,
             instructor=self.request.user
         )
 
@@ -101,16 +112,21 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        tenant = getattr(self.request, 'tenant', None)
         if not user.is_authenticated:
             return self.queryset.none()
+        if not tenant:
+            return self.queryset.none()
+
+        base_qs = self.queryset.filter(course__institution=tenant)
         
         if user.role in ['ADMIN', 'TEACHER']:
             # Pueden ver todas las inscripciones de su institución
-            queryset = self.queryset.filter(course__institution=user.institution)
+            queryset = base_qs
             course_id = self.request.query_params.get('course_id')
             if course_id:
                 queryset = queryset.filter(course_id=course_id)
             return queryset
         
         # Alumnos solo ven las suyas
-        return self.queryset.filter(user=user)
+        return base_qs.filter(user=user)

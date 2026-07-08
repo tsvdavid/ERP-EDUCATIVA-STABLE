@@ -1,38 +1,71 @@
 import { create } from 'zustand';
 import api from '../services/api';
 import { jwtDecode } from "jwt-decode"; 
+import { extractModuleCodesFromBillingPayload } from '../config/moduleVisibilityCatalog';
+
+const loadAvailableModules = async () => {
+    try {
+        const response = await api.get('/subscriptions/my-billing/info/');
+        const payload = response?.data || {};
+        const availableModules = extractModuleCodesFromBillingPayload(payload);
+        console.log('billing payload recibido:', payload);
+        console.log('availableModules:', availableModules);
+        return availableModules;
+    } catch {
+        return [];
+    }
+};
+
+const syncAuthSession = ({ access, refresh = null }) => {
+    if (access) {
+        localStorage.setItem('access_token', access);
+    }
+    if (refresh) {
+        localStorage.setItem('refresh_token', refresh);
+    }
+
+    const decoded = jwtDecode(access);
+    const normalizedRole = decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role;
+    const activeInstitution = decoded.institution_id || decoded.institution || null;
+
+    if (activeInstitution) {
+        localStorage.setItem('active_institution', String(activeInstitution));
+    } else {
+        localStorage.removeItem('active_institution');
+    }
+
+    return {
+        decoded,
+        normalizedRole,
+        activeInstitution,
+    };
+};
 
 export const useAuthStore = create((set) => ({
     user: null,
     isAuthenticated: false,
     isLoading: true,
+    availableModules: [],
 
     login: async (username, password) => {
         try {
             const response = await api.post('/token/', { username, password });
             const { access, refresh } = response.data;
-
-            localStorage.setItem('access_token', access);
-            localStorage.setItem('refresh_token', refresh);
-
-            // Decodificar token
-            const decoded = jwtDecode(access);
+            const { decoded, normalizedRole, activeInstitution } = syncAuthSession({ access, refresh });
+            const availableModules = await loadAvailableModules();
 
             set({
                 isAuthenticated: true,
                 user: {
                     ...decoded,
                     username,
-                    role: decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role,
+                    role: normalizedRole,
                     is_superuser: decoded.role === 'GLOBAL'
                 },
                 isLoading: false,
-                activeInstitution: decoded.institution_id // Set from token
+                activeInstitution,
+                availableModules
             });
-            // Also save to localStorage for persistence
-            if (decoded.institution) {
-                localStorage.setItem('active_institution', decoded.institution);
-            }
             return true;
         } catch (error) {
             console.error('Error de inicio de sesión:', error);
@@ -46,23 +79,24 @@ export const useAuthStore = create((set) => ({
         try {
             const response = await api.post('/auth/refresh/', { refresh: refreshToken });
             const { access } = response.data;
-            localStorage.setItem('access_token', access);
-            const decoded = jwtDecode(access);
+            const { decoded, normalizedRole, activeInstitution } = syncAuthSession({ access });
+            const availableModules = await loadAvailableModules();
             set({
                 user: {
                     ...decoded,
-                    role: decoded.role === 'GLOBAL' ? 'ADMIN' : decoded.role,
+                    role: normalizedRole,
                     is_superuser: decoded.role === 'GLOBAL'
                 },
                 isAuthenticated: true,
-                activeInstitution: localStorage.getItem('active_institution') || decoded.institution_id
+                activeInstitution,
+                availableModules
             });
             return true;
         } catch (error) {
             console.error('Error al refrescar token:', error);
             localStorage.removeItem('access_token');
             localStorage.removeItem('refresh_token');
-            set({ user: null, isAuthenticated: false, activeInstitution: null });
+            set({ user: null, isAuthenticated: false, activeInstitution: null, availableModules: [] });
             return false;
         }
     },
@@ -71,7 +105,7 @@ export const useAuthStore = create((set) => ({
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('active_institution');
-        set({ user: null, isAuthenticated: false, activeInstitution: null });
+        set({ user: null, isAuthenticated: false, activeInstitution: null, availableModules: [] });
     },
 
     checkAuth: async () => {
@@ -93,14 +127,15 @@ export const useAuthStore = create((set) => ({
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('refresh_token');
                     localStorage.removeItem('active_institution');
-                    set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null });
+                    set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null, availableModules: [] });
                 } else {
                     // prioritize localStorage, but fallback to token
                     let activeInst = localStorage.getItem('active_institution');
                     if (!activeInst && decoded.institution_id) {
-                        activeInst = decoded.institution_id;
+                        activeInst = String(decoded.institution_id);
                         localStorage.setItem('active_institution', activeInst);
                     }
+                    const availableModules = await loadAvailableModules();
                     set({
                         user: {
                             ...decoded,
@@ -109,11 +144,12 @@ export const useAuthStore = create((set) => ({
                         },
                         isAuthenticated: true,
                         isLoading: false,
-                        activeInstitution: activeInst
+                        activeInstitution: activeInst,
+                        availableModules
                     });
                 }
             } catch (e) {
-                set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null });
+                set({ user: null, isAuthenticated: false, isLoading: false, activeInstitution: null, availableModules: [] });
             }
         } else if (refreshToken) {
             const success = await useAuthStore.getState().refresh();
@@ -126,11 +162,29 @@ export const useAuthStore = create((set) => ({
     activeInstitution: null,
     setActiveInstitution: (id) => {
         if (id) {
-            localStorage.setItem('active_institution', id);
+            localStorage.setItem('active_institution', String(id));
         } else {
             localStorage.removeItem('active_institution');
         }
         set({ activeInstitution: id });
+    },
+    applyAuthTokens: ({ access, refresh = null }) => {
+        const { decoded, normalizedRole, activeInstitution } = syncAuthSession({ access, refresh });
+        set({
+            user: {
+                ...decoded,
+                role: normalizedRole,
+                is_superuser: decoded.role === 'GLOBAL'
+            },
+            isAuthenticated: true,
+            isLoading: false,
+            activeInstitution: activeInstitution ? String(activeInstitution) : null,
+            availableModules: [],
+        });
+        return decoded;
+    },
+    setAvailableModules: (modules) => {
+        set({ availableModules: Array.isArray(modules) ? modules : [] });
     }
 }));
 

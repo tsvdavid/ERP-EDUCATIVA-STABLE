@@ -8,9 +8,12 @@ from .sri.xml_generator import InvoiceXmlBuilder
 import os
 
 logger = logging.getLogger(__name__)
+from django.conf import settings
 
 @shared_task(bind=True, max_retries=10)
-def process_invoice_sri(self, invoice_id, tenant_id=None, **kwargs):
+def process_invoice_sri(self, invoice_id, tenant_id: int, **kwargs):
+    if not tenant_id:
+        raise ValueError("tenant_id required")
     """
     Task principal para procesar una factura ante el SRI.
     1. Generar/Firmar si no está firmado.
@@ -18,7 +21,7 @@ def process_invoice_sri(self, invoice_id, tenant_id=None, **kwargs):
     3. Si falla con 500, reintentar con backoff.
     """
     try:
-        invoice = Invoice.objects.get(id=invoice_id)
+        invoice = Invoice.objects.get(id=invoice_id, institution_id=tenant_id)
     except Invoice.DoesNotExist:
         return f"Invoice {invoice_id} not found"
 
@@ -75,7 +78,7 @@ def process_invoice_sri(self, invoice_id, tenant_id=None, **kwargs):
         invoice.sri_status = 'RECEIVED'
         invoice.save()
         # Encolar autorización
-        poll_invoice_authorization.apply_async((invoice_id,), countdown=15)
+        poll_invoice_authorization.apply_async((invoice_id, tenant_id), countdown=15)
         return f"Comprobante Recibido: {msg}"
     else:
         # LOG XML for debugging SRI 35/39 errors
@@ -110,12 +113,14 @@ def process_invoice_sri(self, invoice_id, tenant_id=None, **kwargs):
     return f"Reception failed: {msg}"
 
 @shared_task(bind=True, max_retries=20)
-def poll_invoice_authorization(self, invoice_id, tenant_id=None, **kwargs):
+def poll_invoice_authorization(self, invoice_id, tenant_id: int, **kwargs):
+    if not tenant_id:
+        raise ValueError("tenant_id required")
     """
     Consulta el estado de autorización de la factura.
     """
     try:
-        invoice = Invoice.objects.get(id=invoice_id)
+        invoice = Invoice.objects.get(id=invoice_id, institution_id=tenant_id)
     except Invoice.DoesNotExist:
         return
         
@@ -148,7 +153,7 @@ def poll_invoice_authorization(self, invoice_id, tenant_id=None, **kwargs):
         # Enviar email automáticamente al autorizar
         try:
             from notifications.tasks import send_invoice_email_task
-            send_invoice_email_task.delay(invoice.id)
+            send_invoice_email_task.delay(invoice.id, tenant_id)
         except Exception as e:
             logger.error(f"Error enqueuing email after auth: {e}")
             

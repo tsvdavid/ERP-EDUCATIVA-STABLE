@@ -2,13 +2,18 @@ from django.core.management.base import BaseCommand
 from subscriptions.models import Module
 
 BASE_MODULES = [
-    {"code": "users", "name": "Usuarios"},
-    {"code": "academic", "name": "Academia"},
-    {"code": "treasury", "name": "Tesorería"},
-    {"code": "accounting", "name": "Contabilidad"},
-    {"code": "learning", "name": "Aprendizaje"},
-    {"code": "communication", "name": "Comunicación"},
-    {"code": "subscriptions", "name": "Suscripciones"},
+    {"code": "academic", "name": "Académico"},
+    {"code": "portal_digital", "name": "Portal Digital"},
+    {"code": "administrative", "name": "Administrativo"},
+    {"code": "health_wellbeing", "name": "Salud y Bienestar"},
+    {"code": "payroll_rrhh", "name": "Nómina y RRHH"},
+    {"code": "accounting", "name": "Módulo Contable"},
+    {"code": "sales", "name": "Ventas"},
+    {"code": "purchases", "name": "Compras"},
+    {"code": "help", "name": "Ayuda"},
+    {"code": "privacy", "name": "Privacidad"},
+    {"code": "maintenance", "name": "Mantenimiento"},
+    {"code": "saas_management", "name": "Gestión SaaS"},
 ]
 
 class Command(BaseCommand):

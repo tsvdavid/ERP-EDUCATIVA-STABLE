@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../context/authStore';
+import { isModuleVisibleForUser } from '../config/moduleVisibilityCatalog';
 import { 
     GraduationCap, MonitorPlay, FileText, 
     HeartHandshake, Landmark, ShoppingCart, Users, LifeBuoy
@@ -14,6 +15,7 @@ const MODULES = [
         description: 'Gestión de clases, horarios y calificaciones.',
         icon: GraduationCap,
         path: '/dashboard/courses',
+        moduleCode: 'academic',
         color: 'from-primary-500 to-primary-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER']
     },
@@ -23,6 +25,7 @@ const MODULES = [
         description: 'Consulta tus notas, horarios y progreso.',
         icon: GraduationCap,
         path: '/dashboard/student-grades',
+        moduleCode: 'academic',
         color: 'from-primary-500 to-primary-700',
         roles: ['STUDENT', 'PARENT']
     },
@@ -32,6 +35,7 @@ const MODULES = [
         description: 'Accede a clases virtuales y recursos.',
         icon: MonitorPlay,
         path: '/dashboard/campus-virtual',
+        moduleCode: 'learning',
         color: 'from-indigo-500 to-indigo-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'STUDENT', 'PARENT']
     },
@@ -41,6 +45,7 @@ const MODULES = [
         description: 'Bandeja de gestión y solicitudes online.',
         icon: FileText,
         path: '/dashboard/procedures/inbox',
+        moduleCode: 'administrative',
         color: 'from-blue-500 to-blue-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER']
     },
@@ -50,6 +55,7 @@ const MODULES = [
         description: 'Solicita y descarga certificados.',
         icon: FileText,
         path: '/dashboard/procedures/student',
+        moduleCode: 'administrative',
         color: 'from-blue-500 to-blue-700',
         roles: ['STUDENT', 'PARENT']
     },
@@ -59,6 +65,7 @@ const MODULES = [
         description: 'Dispensario médico y control DECE.',
         icon: HeartHandshake,
         path: '/dashboard/health/medical-dispensary',
+        moduleCode: 'health',
         color: 'from-emerald-500 to-teal-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER']
     },
@@ -68,6 +75,7 @@ const MODULES = [
         description: 'Accede a tu ficha médica y seguimientos.',
         icon: HeartHandshake,
         path: '/dashboard/health/my-health',
+        moduleCode: 'health',
         color: 'from-emerald-500 to-teal-700',
         roles: ['STUDENT', 'PARENT']
     },
@@ -77,6 +85,7 @@ const MODULES = [
         description: 'Libros, balances y gestión financiera.',
         icon: Landmark,
         path: '/dashboard/accounting/dashboard',
+        moduleCode: 'accounting',
         color: 'from-slate-700 to-slate-900',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']
     },
@@ -86,6 +95,7 @@ const MODULES = [
         description: 'Facturación, cobros y comprobantes.',
         icon: ShoppingCart,
         path: '/dashboard/treasury/concepts',
+        moduleCode: 'sales',
         color: 'from-violet-500 to-violet-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']
     },
@@ -95,6 +105,7 @@ const MODULES = [
         description: 'Proveedores, gastos y liquidaciones.',
         icon: Users,
         path: '/dashboard/purchases/suppliers',
+        moduleCode: 'purchases',
         color: 'from-cyan-600 to-cyan-800',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'ACCOUNTANT']
     },
@@ -104,20 +115,26 @@ const MODULES = [
         description: 'Soporte técnico e incidentes.',
         icon: LifeBuoy,
         path: '/dashboard/helpdesk/tickets',
+        moduleCode: 'helpdesk',
         color: 'from-orange-500 to-orange-700',
         roles: ['ADMIN', 'LOCAL_ADMIN', 'RECTOR', 'TEACHER', 'PARENT', 'SECRETARY', 'ACCOUNTANT']
     }
 ];
 
 const DashboardHome = () => {
-    const { user } = useAuthStore();
+    const { user, availableModules } = useAuthStore();
 
-    const allowedModules =
-    user?.role === 'GLOBAL' || user?.is_superuser
-        ? MODULES
-        : MODULES.filter(
-              m => m.roles.includes(user?.role)
-          );
+    const allowedModules = MODULES.filter((moduleDef) => {
+        if (!moduleDef.roles.includes(user?.role)) {
+            return false;
+        }
+
+        return isModuleVisibleForUser({
+            user,
+            availableModules,
+            moduleCode: moduleDef.moduleCode,
+        });
+    });
 
     return (
         <div className="p-4 md:p-8 max-w-7xl mx-auto w-full animate-fade-in">

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Edit, Trash2, Check, X, Shield, Package } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import subscriptionService from '../../services/subscriptionService';
+import { moduleCatalogByCode } from '../../config/moduleVisibilityCatalog';
 
 const PlansManagementPage = () => {
     const [plans, setPlans] = useState([]);
@@ -22,7 +23,7 @@ const PlansManagementPage = () => {
             setLoading(true);
             const [plansRes, modulesRes] = await Promise.all([
                 subscriptionService.getPlans(),
-                subscriptionService.getModules()
+                subscriptionService.getGlobalModulesCatalog()
             ]);
             setPlans(plansRes);
             setModules(modulesRes);
@@ -36,6 +37,13 @@ const PlansManagementPage = () => {
     useEffect(() => {
         loadData();
     }, []);
+
+    const modulesWithSubmodules = useMemo(() => {
+        return modules.map((mod) => ({
+            ...mod,
+            submodules: moduleCatalogByCode[mod.code]?.submodules || []
+        }));
+    }, [modules]);
 
     const openModal = (plan = null) => {
         if (plan) {
@@ -199,23 +207,37 @@ const PlansManagementPage = () => {
 
                             <div>
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Módulos Incluidos</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    {modules.map(mod => (
-                                        <button
-                                            key={mod.id}
-                                            type="button"
-                                            onClick={() => handleModuleToggle(mod.id)}
-                                            className={`flex items-center justify-between px-5 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${
-                                                formData.included_modules.includes(mod.id)
-                                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                                : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
-                                            }`}
-                                        >
-                                            {mod.name}
-                                            {formData.included_modules.includes(mod.id) && <Check size={16} strokeWidth={3} />}
-                                        </button>
-                                    ))}
-                                </div>
+                                {modulesWithSubmodules.length === 0 ? (
+                                    <div className="px-5 py-4 rounded-2xl bg-slate-50 text-sm font-semibold text-slate-500 border border-slate-100">
+                                        No existen módulos registrados en el catálogo global.
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {modulesWithSubmodules.map(mod => (
+                                            <button
+                                                key={mod.id}
+                                                type="button"
+                                                onClick={() => handleModuleToggle(mod.id)}
+                                                className={`flex items-start justify-between gap-3 px-5 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${
+                                                    formData.included_modules.includes(mod.id)
+                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                                    : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
+                                                }`}
+                                            >
+                                                <span className="text-left">
+                                                    <span className="block">{mod.name}</span>
+                                                    <span className="block mt-1 text-[10px] uppercase tracking-wider opacity-70">{mod.code}</span>
+                                                    {mod.submodules.length > 0 && (
+                                                        <span className="block mt-2 text-xs font-semibold opacity-80">
+                                                            {mod.submodules.join(' · ')}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                {formData.included_modules.includes(mod.id) && <Check size={16} strokeWidth={3} />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl">

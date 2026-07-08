@@ -8,6 +8,7 @@ from payments.models import Transaction, PaymentLog, PaymentGatewayConfig
 from payments.serializers import TransactionSerializer, CheckoutSerializer, PaymentGatewayConfigSerializer
 from payments.gateways.factory import PaymentGatewayFactory
 from users.permissions import IsTreasuryStaff, IsLocalAdminUser
+from rest_framework.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +18,12 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return Transaction.objects.none()
         if hasattr(self, 'action') and self.action == 'verify_transfer' and (user.role in ['ADMIN', 'LOCAL_ADMIN', 'ACCOUNTANT', 'RECTOR', 'SECRETARY'] or user.is_superuser):
-            return Transaction.objects.all()
-        return Transaction.objects.filter(user=user)
+            return Transaction.objects.filter(institution=tenant)
+        return Transaction.objects.filter(user=user, institution=tenant)
 
     @action(detail=False, methods=['post'], serializer_class=CheckoutSerializer)
     def checkout(self, request):
@@ -35,6 +39,9 @@ class PaymentViewSet(viewsets.ModelViewSet):
         gateway_name = data.get('gateway_name')
         
         try:
+            tenant = getattr(request, 'tenant', None)
+            if not tenant:
+                return Response({'error': 'No institution context found'}, status=status.HTTP_400_BAD_REQUEST)
             # 1. Crear transacción PENDIENTE (o en VERIFICACIÓN si es transferencia)
             with db_transaction.atomic():
                 status_to_save = Transaction.Status.PENDING
@@ -43,6 +50,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                     
                 txn = Transaction.objects.create(
                     user=request.user,
+                    institution=tenant,
                     amount=data['amount'],
                     currency=data['currency'],
                     status=status_to_save,
@@ -53,8 +61,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 )
             
             # 2. Obtener el adaptador
-            institution = getattr(request.user, 'institution', None)
-            gateway = PaymentGatewayFactory.get_gateway(gateway_name, institution=institution)
+            gateway = PaymentGatewayFactory.get_gateway(gateway_name, institution=tenant)
             
             # 3. Solicitar URL o Token al proveedor
             result = gateway.create_payment_intent(txn)
@@ -74,7 +81,14 @@ class PaymentViewSet(viewsets.ModelViewSet):
         """
         Retorna transacciones en estado VERIFYING para que sean aprobadas/rechazadas por Admin/Tesorería.
         """
-        txns = Transaction.objects.filter(status=Transaction.Status.VERIFYING, gateway_name='bank_transfer')
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response([])
+        txns = Transaction.objects.filter(
+            institution=tenant,
+            status=Transaction.Status.VERIFYING,
+            gateway_name='bank_transfer'
+        )
         serializer = self.get_serializer(txns, many=True)
         return Response(serializer.data)
 
@@ -225,14 +239,17 @@ class PaymentGatewayConfigViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return PaymentGatewayConfig.objects.none()
         # Todos los autenticados pueden ver la lista activa
         if getattr(self.request.user, 'role', '') == 'ADMIN':
             return PaymentGatewayConfig.objects.filter(
-                institution=getattr(self.request.user, 'institution', None)
+                institution=tenant
             )
         else:
             return PaymentGatewayConfig.objects.filter(
-                institution=getattr(self.request.user, 'institution', None),
+                institution=tenant,
                 is_active=True
             )
 
@@ -276,4 +293,7 @@ class PaymentGatewayConfigViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        serializer.save(institution=getattr(self.request.user, 'institution', None))
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No institution context found')
+        serializer.save(institution=tenant)

@@ -1,4 +1,5 @@
 from rest_framework import viewsets, permissions, status, serializers
+from rest_framework.exceptions import ValidationError
 
 from .models import PolicyVersion, ConsentRecord, ARCORequest, TreatmentActivity, DataBreach
 from .serializers import (
@@ -8,34 +9,46 @@ from .serializers import (
     TreatmentActivitySerializer,
     DataBreachSerializer
 )
-from django.db.models import Q
-from users.models import Institution
 from users.permissions import IsAdminUser, IsLocalAdminUser
 
 class PolicyVersionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PolicyVersion.objects.filter(is_active=True).order_by('-published_at')
     serializer_class = PolicyVersionSerializer
-    permission_classes = [permissions.AllowAny] # Publicly viewable
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return self.queryset.none()
+        return self.queryset.filter(institution=tenant)
 
 class ConsentRecordViewSet(viewsets.ModelViewSet):
     serializer_class = ConsentRecordSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return ConsentRecord.objects.filter(user=self.request.user)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return ConsentRecord.objects.none()
+        return ConsentRecord.objects.filter(user=self.request.user, institution=tenant)
 
     def perform_create(self, serializer):
         # Capture metadata
         ip = self.request.META.get('REMOTE_ADDR')
         agent = self.request.META.get('HTTP_USER_AGENT', '')
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No se pudo determinar el tenant activo.')
         serializer.save(
+            institution=tenant,
             user=self.request.user,
             ip_address=ip,
             user_agent=agent
         )
 
-from django.db.models import Q
-from users.models import Institution
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        serializer.save(institution=instance.institution, user=instance.user)
 
 class ARCORequestViewSet(viewsets.ModelViewSet):
     serializer_class = ARCORequestSerializer
@@ -43,30 +56,21 @@ class ARCORequestViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Optimize query
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return ARCORequest.objects.none()
+
         base_qs = ARCORequest.objects.select_related('institution', 'requester')
 
-        # 1. Superusers always see everything
-        if user.is_superuser:
-            return base_qs
+        if user.role in ['ADMIN', 'RECTOR', 'LOCAL_ADMIN'] or user.is_superuser:
+            return base_qs.filter(institution=tenant)
 
-        # 2. Admins and Rectors see their institution's requests
-        if user.role in ['ADMIN', 'RECTOR']: 
-            if user.institution:
-                # Show requests from their institution OR their own personal requests
-                qs = base_qs.filter(Q(institution=user.institution) | Q(requester=user))
-                return qs.distinct()
-            
-        # 3. Everyone else (Student, Parent, Teacher) OR Admins without institution
-        # only see their own requests.
-        return base_qs.filter(requester=user)
+        return base_qs.filter(requester=user, institution=tenant)
 
     def perform_create(self, serializer):
-        institution = self.request.user.institution
+        institution = getattr(self.request, 'tenant', None)
         if not institution:
-            # BLOQUEO: Ya no permitimos fallback a Institution.objects.first()
-            # Esto evita que peticiones de privacidad se asignen a la institución equivocada
-            raise serializers.ValidationError({"institution": "No hay una institución asociada a su cuenta de usuario."})
+            raise serializers.ValidationError({"institution": "No se pudo determinar el tenant activo."})
 
         serializer.save(institution=institution, requester=self.request.user)
 
@@ -75,11 +79,37 @@ class TreatmentActivityViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAdminUser]
     
     def get_queryset(self):
-        return TreatmentActivity.objects.filter(institution=self.request.user.institution)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return TreatmentActivity.objects.none()
+        return TreatmentActivity.objects.filter(institution=tenant)
+
+    def perform_create(self, serializer):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No se pudo determinar el tenant activo.')
+        serializer.save(institution=tenant)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        serializer.save(institution=instance.institution)
 
 class DataBreachViewSet(viewsets.ModelViewSet):
     serializer_class = DataBreachSerializer
     permission_classes = [permissions.IsAdminUser] # Only admins can manage breach records
     
     def get_queryset(self):
-        return DataBreach.objects.filter(institution=self.request.user.institution)
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return DataBreach.objects.none()
+        return DataBreach.objects.filter(institution=tenant)
+
+    def perform_create(self, serializer):
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No se pudo determinar el tenant activo.')
+        serializer.save(institution=tenant)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        serializer.save(institution=instance.institution)

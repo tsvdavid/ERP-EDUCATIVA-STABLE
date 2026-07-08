@@ -4,10 +4,13 @@ import { useAuthStore } from '../../context/authStore';
 import api from '../../services/api';
 
 const SetupWizard = () => {
-    const { user, checkAuth } = useAuthStore();
+    const { user } = useAuthStore();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [statusLoading, setStatusLoading] = useState(true);
+    const [statusError, setStatusError] = useState(null);
+    const [completeError, setCompleteError] = useState(null);
     const [checklist, setChecklist] = useState(null);
     
     const [formData, setFormData] = useState({
@@ -28,14 +31,19 @@ const SetupWizard = () => {
     }, [user]);
 
     const fetchStatus = async () => {
+        setStatusLoading(true);
+        setStatusError(null);
         try {
-            const res = await api.get(`/institutions/${user.institution}/setup-status/`);
+            const res = await api.get(`/users/institutions/${user.institution}/setup-status/`);
             setChecklist(res.data);
             if (res.data.wizard_completed) {
                 navigate('/dashboard');
             }
         } catch (err) {
             console.error("Error fetching setup status", err);
+            setStatusError("No se pudo cargar configuración inicial");
+        } finally {
+            setStatusLoading(false);
         }
     };
 
@@ -44,29 +52,52 @@ const SetupWizard = () => {
 
     const handleComplete = async () => {
         setLoading(true);
+        setCompleteError(null);
         try {
-            // 1. Update Institution Basic Info
-            await api.patch(`/institutions/${user.institution}/`, {
+            // 1. Update institution fields that are editable through regular PATCH.
+            await api.patch(`/users/institutions/${user.institution}/`, {
                 ruc: formData.ruc,
                 establishment_code: formData.establishment_code,
                 emission_point: formData.emission_point,
                 obligado_contabilidad: formData.obligado_contabilidad,
-                setup_status: 'READY_FULL',
-                wizard_completed: true
             });
-            
-            // 2. Refresh Auth to update token claims (wizard_completed)
-            await useAuthStore.getState().refresh();
+
+            // 2. Complete wizard through dedicated controlled endpoint.
+            const completeRes = await api.post(`/users/institutions/${user.institution}/complete-wizard/`);
+            if (!completeRes?.data?.success || !completeRes?.data?.wizard_completed) {
+                throw new Error('No se pudo completar el wizard');
+            }
+
+            // 3. Reflect completion in local auth state to prevent guard redirect loop.
+            useAuthStore.setState((state) => ({
+                user: state.user ? { ...state.user, wizard_completed: true } : state.user,
+            }));
             
             navigate('/dashboard');
         } catch (err) {
-            alert("Error al completar el wizard: " + (err.response?.data?.error || err.message));
+            setCompleteError(err.response?.data?.error || err.message || 'No se pudo completar la configuración');
         } finally {
             setLoading(false);
         }
     };
 
-    if (!checklist) return <div className="p-10 text-center">Cargando configuración inicial...</div>;
+    if (statusLoading) return <div className="p-10 text-center">Cargando configuración inicial...</div>;
+
+    if (statusError) {
+        return (
+            <div className="p-10 text-center">
+                <p className="text-red-600 font-medium mb-4">{statusError}</p>
+                <button
+                    onClick={fetchStatus}
+                    className="px-6 py-2.5 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-all"
+                >
+                    Reintentar
+                </button>
+            </div>
+        );
+    }
+
+    if (!checklist) return <div className="p-10 text-center">No se pudo cargar configuración inicial</div>;
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -204,13 +235,18 @@ const SetupWizard = () => {
                                 Siguiente
                             </button>
                         ) : (
-                            <button 
-                                onClick={handleComplete}
-                                disabled={loading}
-                                className="px-8 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 shadow-md transition-all active:scale-95 disabled:bg-slate-400"
-                            >
-                                {loading ? "Procesando..." : "Finalizar Configuración"}
-                            </button>
+                            <div className="flex flex-col items-end gap-2">
+                                {completeError && (
+                                    <p className="text-sm text-red-600 font-medium">{completeError}</p>
+                                )}
+                                <button 
+                                    onClick={handleComplete}
+                                    disabled={loading}
+                                    className="px-8 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 shadow-md transition-all active:scale-95 disabled:bg-slate-400"
+                                >
+                                    {loading ? "Procesando..." : "Finalizar Configuración"}
+                                </button>
+                            </div>
                         )}
                     </div>
                 </div>

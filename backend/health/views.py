@@ -26,7 +26,7 @@ from users.tenant_mixins import InstitutionFilterMixin
 # ─── FICHAS PERMANENTES ────────────────────────────────────────────────────────
 
 class MedicalRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = MedicalRecord.objects.all()
+    queryset = MedicalRecord.objects.unscoped()
     serializer_class = MedicalRecordSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -42,7 +42,7 @@ class MedicalRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
 
 class MedicalVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = MedicalVisit.objects.all()
+    queryset = MedicalVisit.objects.unscoped()
     serializer_class = MedicalVisitSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -60,11 +60,11 @@ class MedicalVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(doctor=self.request.user)
+        serializer.save(doctor=self.request.user, institution=self.request.tenant)
 
 
 class DeceRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = DeceRecord.objects.all()
+    queryset = DeceRecord.objects.unscoped()
     serializer_class = DeceRecordSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -80,7 +80,7 @@ class DeceRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
 
 class DeceVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = DeceVisit.objects.all()
+    queryset = DeceVisit.objects.unscoped()
     serializer_class = DeceVisitSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -98,13 +98,13 @@ class DeceVisitViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(counselor=self.request.user)
+        serializer.save(counselor=self.request.user, institution=self.request.tenant)
 
 
 # ─── REGISTROS CONDUCTUALES ───────────────────────────────────────────────────
 
 class BehaviorRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = BehaviorRecord.objects.select_related('student', 'created_by', 'subject', 'course', 'academic_year')
+    queryset = BehaviorRecord.objects.unscoped().select_related('student', 'created_by', 'subject', 'course', 'academic_year')
     serializer_class = BehaviorRecordSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -142,7 +142,7 @@ class BehaviorRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        record = serializer.save(created_by=self.request.user)
+        record = serializer.save(created_by=self.request.user, institution=self.request.tenant)
         # Disparar motor de reglas
         try:
             user = self.request.user
@@ -169,7 +169,7 @@ class BehaviorRecordViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=data)
         if serializer.is_valid():
-            record = serializer.save(created_by=request.user)
+            record = serializer.save(created_by=request.user, institution=request.tenant)
             try:
                 institution = getattr(request.user, 'institution', None)
                 if institution:
@@ -239,7 +239,7 @@ class BehaviorCaseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save(created_by=self.request.user, institution=self.request.tenant)
 
     @action(detail=True, methods=['post'])
     def derive(self, request, pk=None):
@@ -344,7 +344,7 @@ class CaseFollowUpViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs.order_by('-created_at')
 
     def perform_create(self, serializer):
-        follow_up = serializer.save(created_by=self.request.user)
+        follow_up = serializer.save(created_by=self.request.user, institution=self.request.tenant)
         # Actualizar estado del caso a IN_PROGRESS si estaba OPEN
         case = follow_up.case
         if case.status == 'OPEN':
@@ -471,7 +471,7 @@ class StudentRiskProfileViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelVi
 # ─── REGLAS DE ALERTA ─────────────────────────────────────────────────────────
 
 class AlertRuleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = AlertRule.objects.all()
+    queryset = AlertRule.objects.unscoped()
     serializer_class = AlertRuleSerializer
     permission_classes = [IsAuthenticated]
     tenant_field = 'institution'
@@ -485,6 +485,6 @@ class AlertRuleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         institution = getattr(self.request.user, 'institution', None)
         if institution:
-            serializer.save(institution=institution)
+            serializer.save(institution=self.request.tenant)
         else:
-            serializer.save()
+            serializer.save(institution=self.request.tenant)

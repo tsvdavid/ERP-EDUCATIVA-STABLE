@@ -6,16 +6,21 @@ from .serializers import AIProviderConfigSerializer
 from .services import AIServiceFactory
 
 class AIConfigViewSet(viewsets.ModelViewSet):
-    queryset = AIProviderConfig.objects.all()
+    queryset = AIProviderConfig.objects.unscoped()
     serializer_class = AIProviderConfigSerializer
     permission_classes = [permissions.IsAdminUser]
 
     def get_queryset(self):
-        return self.queryset.filter(institution=self.request.user.institution)
+        tenant = getattr(self.request, 'tenant', None) or getattr(self.request.user, 'institution', None)
+        if tenant is None:
+            return self.queryset.none()
+        return self.queryset.filter(institution=tenant)
 
     @action(detail=False, methods=['post'])
     def test_connection(self, request):
-        institution = request.user.institution
+        institution = getattr(request, 'tenant', None) or getattr(request.user, 'institution', None)
+        if institution is None:
+            return Response({"status": "error", "message": "No tenant context available."}, status=status.HTTP_400_BAD_REQUEST)
         try:
             provider = AIServiceFactory.get_provider(institution)
             response = provider.generate_completion("Hola, responde con la palabra 'OK' si recibes este mensaje.", system_prompt="Eres un asistente de pruebas.")

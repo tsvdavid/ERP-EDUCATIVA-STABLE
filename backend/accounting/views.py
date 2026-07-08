@@ -11,19 +11,18 @@ from .serializers import (
 from decimal import Decimal
 from django.utils import timezone
 from users.tenant_mixins import InstitutionFilterMixin
+from core.tenancy.viewsets import BaseTenantViewSet
 from users.permissions import IsGlobalAdmin
 
-class FiscalYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = FiscalYear.objects.all()
+class FiscalYearViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = FiscalYear.objects.unscoped()
     serializer_class = FiscalYearSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
 
     def get_queryset(self):
         return super().get_queryset().order_by('-year')
-
-    def perform_create(self, serializer):
-        serializer.save(institution=self.request.user.institution)
+    # Creation handled by BaseTenantViewSet using request.tenant
 
     @action(detail=True, methods=['post'])
     def close_year(self, request, pk=None):
@@ -33,7 +32,7 @@ class FiscalYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         import datetime
 
         fiscal_year = self.get_object()
-        institution = request.user.institution
+        institution = request.tenant
 
         if fiscal_year.is_closed:
             return Response({'error': 'El año fiscal ya está cerrado.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -134,22 +133,19 @@ class FiscalYearViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             'journal_entry_id': entry.id
         })
 
-class MonthlyCloseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = MonthlyClose.objects.all()
+class MonthlyCloseViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = MonthlyClose.objects.unscoped()
     serializer_class = MonthlyCloseSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
 
     def perform_create(self, serializer):
-        # Logic to ensure the month isn't already closed via POST
         month = serializer.validated_data.get('month')
         year = serializer.validated_data.get('year')
-        
-        if MonthlyClose.objects.filter(institution=self.request.user.institution, year=year, month=month, is_closed=True).exists():
-             raise serializers.ValidationError("Este periodo ya se encuentra cerrado.")
-
+        if MonthlyClose.objects.filter(institution=request.tenant, year=year, month=month, is_closed=True).exists():
+            raise serializers.ValidationError("Este periodo ya se encuentra cerrado.")
         serializer.save(
-            institution=self.request.user.institution,
+            institution=request.tenant,
             closed_by=self.request.user,
             is_closed=True,
             closed_at=timezone.now()
@@ -166,8 +162,8 @@ class MonthlyCloseViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return Response({'status': 'reopened', 'message': f'Periodo {close.month}/{close.year} reaperturado.'})
 
 
-class AccountViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Account.objects.all()
+class AccountViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Account.objects.unscoped()
     serializer_class = AccountSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -181,8 +177,8 @@ class AccountViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             
         return queryset
 
-class JournalEntryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = JournalEntry.objects.all()
+class JournalEntryViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = JournalEntry.objects.unscoped()
     serializer_class = JournalEntrySerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -191,9 +187,7 @@ class JournalEntryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return super().get_queryset().order_by('-date', '-id')
 
     def perform_create(self, serializer):
-        serializer.save(
-            created_by=self.request.user
-        )
+        serializer.save(created_by=self.request.user)
 
     @action(detail=True, methods=['post'])
     def post_entry(self, request, pk=None):
@@ -218,8 +212,8 @@ class JournalEntryViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         entry.save()
         return Response({'status': 'cancelled'})
 
-class BankViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Bank.objects.all()
+class BankViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = Bank.objects.unscoped()
     serializer_class = BankSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -227,8 +221,8 @@ class BankViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         return super().get_queryset().order_by('name')
 
-class BankAccountViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = BankAccount.objects.all()
+class BankAccountViewSet(InstitutionFilterMixin, BaseTenantViewSet):
+    queryset = BankAccount.objects.unscoped()
     serializer_class = BankAccountSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -256,11 +250,11 @@ class ReportViewSet(viewsets.ViewSet):
         # Date range filter if needed
         
         # 1. Assets (ACTIVO)
-        assets = self._get_account_tree(user.institution, 'ASSET')
+        assets = self._get_account_tree(request.tenant, 'ASSET')
         # 2. Liabilities (PASIVO)
-        liabilities = self._get_account_tree(user.institution, 'LIABILITY')
+        liabilities = self._get_account_tree(request.tenant, 'LIABILITY')
         # 3. Equity (PATRIMONIO)
-        equity = self._get_account_tree(user.institution, 'EQUITY')
+        equity = self._get_account_tree(request.tenant, 'EQUITY')
 
         # Calculate totals
         total_assets = self._get_group_total(assets)
@@ -268,7 +262,7 @@ class ReportViewSet(viewsets.ViewSet):
         total_equity = self._get_group_total(equity)
         
         # Calculate Current Net Income (Income - Expense) to add to Equity (Retained Earnings)
-        net_income = self._calculate_net_income(user.institution)
+        net_income = self._calculate_net_income(request.tenant)
         
         return Response({
             'assets': assets,
@@ -283,10 +277,10 @@ class ReportViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def income_statement(self, request):
-        user = user = request.user
+        user = request.user
         
-        income = self._get_account_tree(user.institution, 'INCOME')
-        expenses = self._get_account_tree(user.institution, 'EXPENSE')
+        income = self._get_account_tree(request.tenant, 'INCOME')
+        expenses = self._get_account_tree(request.tenant, 'EXPENSE')
         
         total_income = self._get_group_total(income)
         total_expenses = self._get_group_total(expenses)
@@ -311,7 +305,7 @@ class ReportViewSet(viewsets.ViewSet):
         from .models import Account, JournalItem
         from django.db.models import Sum
 
-        accounts = Account.objects.filter(institution=user.institution).order_by('code')
+        accounts = Account.objects.filter(institution=request.tenant).order_by('code')
         data = []
 
         for acc in accounts:
@@ -388,7 +382,7 @@ class ReportViewSet(viewsets.ViewSet):
         year = int(request.query_params.get('year', 2024))
         month = int(request.query_params.get('month', 1))
 
-        generator = ATSGenerator(user.institution, year, month)
+        generator = ATSGenerator(request.tenant, year, month)
         xml_content = generator.generate_xml()
 
         response = HttpResponse(xml_content, content_type='application/xml')
@@ -531,7 +525,7 @@ class ReportViewSet(viewsets.ViewSet):
         return total
 
 class FixedAssetViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = FixedAsset.objects.all()
+    queryset = FixedAsset.objects.unscoped()
     serializer_class = FixedAssetSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -611,7 +605,7 @@ class FixedAssetViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return Response({'status': 'ok', 'amount': total_to_depreciate, 'months': months_passed})
 
 class AccountingConfigViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = AccountingConfig.objects.all()
+    queryset = AccountingConfig.objects.unscoped()
     serializer_class = AccountingConfigSerializer
     permission_classes = [IsGlobalAdmin]
     tenant_field = 'institution'

@@ -3,14 +3,19 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from ..models import Module, Lesson, LearningResource, LMSEnrollment, LessonProgress
 from ..serializers import ModuleSerializer, LessonSerializer, LearningResourceSerializer, LessonProgressSerializer
+from users.tenant_mixins import InstitutionFilterMixin
 
-class ModuleViewSet(viewsets.ModelViewSet):
+class ModuleViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Module.objects.all()
     serializer_class = ModuleSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'course__institution'
 
-class LessonViewSet(viewsets.ModelViewSet):
+class LessonViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'module__course__institution'
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def complete(self, request, pk=None):
@@ -36,11 +41,14 @@ class LessonViewSet(viewsets.ModelViewSet):
         except LMSEnrollment.DoesNotExist:
             return Response({'error': 'Not enrolled in this course'}, status=status.HTTP_400_BAD_REQUEST)
 
-class LearningResourceViewSet(viewsets.ModelViewSet):
+class LearningResourceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = LearningResource.objects.all()
     serializer_class = LearningResourceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'lesson__module__course__institution'
 
-class LessonProgressViewSet(viewsets.ModelViewSet):
+class LessonProgressViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = LessonProgress.objects.all()
     serializer_class = LessonProgressSerializer
     permission_classes = [permissions.IsAuthenticated]
+    tenant_lookup = 'enrollment__course__institution'

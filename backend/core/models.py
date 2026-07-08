@@ -39,9 +39,15 @@ class TenantManager(BaseUserManager, models.Manager):
             if hasattr(self.model, 'is_superuser'):
                 return qs.filter(Q(institution_id=tenant_id) | Q(is_superuser=True))
             return qs.filter(institution_id=tenant_id)
-            
-        # Si NO hay tenant, retornamos todo
-        return qs
+
+        # Si NO hay tenant, no devolvemos registros por defecto
+        return qs.none()
+
+    def global_queryset(self):
+        return TenantQuerySet(self.model, using=self._db)
+
+    def unscoped(self):
+        return self.global_queryset()
 
     def get_by_natural_key(self, username):
         # Necesario para el sistema de autenticación de Django

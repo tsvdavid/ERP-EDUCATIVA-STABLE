@@ -20,11 +20,11 @@ from celery.schedules import crontab
 
 app.conf.beat_schedule = {
     'daily-subscription-check': {
-        'task': 'subscriptions.tasks.daily_subscription_check',
+        'task': 'subscriptions.tasks.run_daily_subscription_check_for_all_tenants',
         'schedule': crontab(minute=0, hour=0),
     },
     'capture-daily-kpis': {
-        'task': 'subscriptions.tasks.capture_daily_kpis',
+        'task': 'subscriptions.tasks.run_capture_daily_kpis_for_all_tenants',
         'schedule': crontab(minute=0, hour=1),
     },
 }

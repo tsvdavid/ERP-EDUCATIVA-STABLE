@@ -22,6 +22,7 @@ from .models import PaymentConcept, PaymentMethod, Invoice, InvoiceDetail, Payme
 from users.models import User, Institution
 from users.tenant_mixins import InstitutionFilterMixin
 from users.permissions import IsTreasuryStaff
+from rest_framework.exceptions import ValidationError
 
 class PaymentConceptViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
     queryset = PaymentConcept.objects.filter(is_active=True)
@@ -40,7 +41,7 @@ class PaymentMethodViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSet
     tenant_field = 'institution'
 
 class StudentAccountViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSet):
-    queryset = StudentAccount.objects.all().select_related('student', 'student__institution')
+    queryset = StudentAccount.objects.unscoped().select_related('student', 'student__institution')
     serializer_class = StudentAccountSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -57,7 +58,7 @@ class StudentAccountViewSet(InstitutionFilterMixin, viewsets.ReadOnlyModelViewSe
         return qs
 
 class CustomerViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Customer.objects.all()
+    queryset = Customer.objects.unscoped()
     serializer_class = CustomerSerializer
     permission_classes = [IsTreasuryStaff]
     tenant_field = 'institution'
@@ -80,7 +81,7 @@ class CustomerViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return qs
 
 class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Charge.objects.all().select_related('student', 'concept', 'institution')
+    queryset = Charge.objects.unscoped().select_related('student', 'concept', 'institution')
     serializer_class = ChargeSerializer
     tenant_field = 'institution'
 
@@ -138,7 +139,10 @@ class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         due_date = data.get('due_date')
         
         try:
-            concept = PaymentConcept.objects.get(pk=concept_id, institution=request.user.institution)
+            tenant = getattr(request, 'tenant', None)
+            if not tenant:
+                return Response({'error': 'No institution context found'}, status=400)
+            concept = PaymentConcept.objects.get(pk=concept_id, institution=tenant)
             students = []
             
             if data.get('student_ids'):
@@ -154,8 +158,8 @@ class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             for student in students:
                  # Check duplicate? Maybe same concept same month?
                  # For now, just create.
-                 charges_to_create.append(Charge(
-                    institution=student.institution,
+                charges_to_create.append(Charge(
+                    institution=tenant,
                     student=student,
                     concept=concept,
                     amount=concept.price,
@@ -176,13 +180,10 @@ class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         Summary of pending payments grouped by course.
         Supports filtering by academic_year_id and course_id.
         """
-        user = self.request.user
-        inst_id = user.institution_id
-        if not inst_id:
-             inst_id = request.headers.get('X-Institution-ID')
-             
-        if not inst_id:
-             return Response({"error": "No institution context found"}, status=400)
+        tenant = getattr(request, "tenant", None)
+        if not tenant:
+            return Response({"error": "No institution context found"}, status=400)
+        inst_id = tenant.id
 
         from django.db.models import Sum, Q
         from academic.models import Course
@@ -252,7 +253,7 @@ class ChargeViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         })
 
 class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Invoice.objects.all().select_related('institution', 'student', 'customer', 'payment_method').prefetch_related('details', 'details__concept')
+    queryset = Invoice.objects.unscoped().select_related('institution', 'student', 'customer', 'payment_method').prefetch_related('details', 'details__concept')
     serializer_class = InvoiceSerializer
     tenant_field = 'institution'
 
@@ -286,15 +287,21 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # HARDENING: Inyectar usuario y asegurar institución
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            raise ValidationError('No institution context found')
         serializer.save(
             created_by=self.request.user,
-            institution=self.request.user.institution
+            institution=tenant
         )
 
     @action(detail=False, methods=['get'], url_path='commercial-dashboard')
     def commercial_dashboard(self, request):
         from django.db.models import Sum, Count
-        inst_id = self.request.user.institution_id
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'No institution context found'}, status=400)
+        inst_id = tenant.id
         
         # Base filter for the institution
         base_qs = Invoice.objects.filter(institution_id=inst_id, status='ISSUED')
@@ -361,7 +368,10 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             
             try:
                 # 1. Determine Customer with SECURITY FIX
-                inst = request.user.institution
+                inst = getattr(request, 'tenant', None)
+                if not inst:
+                    return Response({'error': 'No institution context found'}, status=400)
+                student_id = data.get('student_id')
                 if customer_id:
                     customer = Customer.objects.get(pk=customer_id, institution=inst)
                 elif student_id:
@@ -490,7 +500,7 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
                 invoice.save()
                 
                 # Trigger SRI Process automatically
-                process_invoice_sri.delay(invoice.id)
+                process_invoice_sri.delay(invoice.id, tenant_id=invoice.institution_id)
 
                 
                 # Register Payment if not pending
@@ -541,15 +551,19 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             return Response({'error': 'Faltan datos requeridos (student_ids, concept_id)'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            concept = PaymentConcept.objects.get(pk=concept_id)
-            pay_method = PaymentMethod.objects.get(pk=pay_method_id) if pay_method_id else None
+            tenant = getattr(request, 'tenant', None)
+            if not tenant:
+                return Response({'error': 'No institution context found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            concept = PaymentConcept.objects.get(pk=concept_id, institution=tenant)
+            pay_method = PaymentMethod.objects.get(pk=pay_method_id, institution=tenant) if pay_method_id else None
             
-            students = User.objects.filter(id__in=student_ids, role='STUDENT')
+            students = User.objects.filter(id__in=student_ids, role='STUDENT', institution=tenant)
             if not students.exists():
                 return Response({'error': 'No se encontraron estudiantes para facturar.'}, status=status.HTTP_400_BAD_REQUEST)
                 
             from .utils import get_next_invoice_number
-            inst = students.first().institution or concept.institution
+            inst = tenant
             est = getattr(inst, 'establishment_code', '001')
             pto = getattr(inst, 'emission_point', '001')
             
@@ -626,7 +640,7 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
                 invoice.save()
                 
                 # Trigger SRI Process automatically
-                process_invoice_sri.delay(invoice.id)
+                process_invoice_sri.delay(invoice.id, tenant_id=invoice.institution_id)
 
                 
                 # No se crea el 'Payment' log porque es pendiente.
@@ -786,7 +800,10 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         from django.utils import timezone
         import datetime
         
-        inst_id = self.request.user.institution_id
+        tenant = getattr(self.request, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'No institution context found'}, status=400)
+        inst_id = tenant.id
         today = timezone.now().date()
         
         # 1. Metrics
@@ -889,7 +906,7 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
         try:
             from .tasks import process_invoice_sri
-            process_invoice_sri.delay(invoice.id)
+            process_invoice_sri.delay(invoice.id, tenant_id=invoice.institution_id)
             return Response({
                 'message': 'Proceso de facturación electrónica iniciado en segundo plano.',
                 'status': invoice.sri_status
@@ -898,7 +915,7 @@ class InvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
             return Response({'error': f"Error al encolar tarea: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = CreditNote.objects.all().select_related('invoice')
+    queryset = CreditNote.objects.unscoped().select_related('invoice')
     serializer_class = CreditNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_lookup = 'invoice__institution'
@@ -916,20 +933,26 @@ class CreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # HARDENING: Filtrar por institución del usuario para evitar fugas de secuencia
-        inst = self.request.user.institution
+        inst = getattr(self.request, 'tenant', None)
+        if not inst:
+            raise ValidationError('No institution context found')
         last_note = CreditNote.objects.filter(invoice__institution=inst).order_by('-id').first()
         seq = (last_note.id + 1) if last_note else 1
         number = f"NC-{str(seq).zfill(6)}"
-        serializer.save(number=number)
+        serializer.save(number=number, institution=self.request.tenant)
 
 class DebitNoteViewSet(viewsets.ModelViewSet):
-    queryset = DebitNote.objects.all().select_related('invoice')
+    queryset = DebitNote.objects.unscoped().select_related('invoice')
     serializer_class = DebitNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
         queryset = super().get_queryset()
+        tenant = getattr(self.request, 'tenant', None)
+        if tenant is None:
+            return queryset.none()
+        queryset = queryset.filter(invoice__institution=tenant)
         if user.role in ['STUDENT', 'PARENT']:
             if user.role == 'STUDENT':
                 return queryset.filter(invoice__student=user)
@@ -940,8 +963,10 @@ class DebitNoteViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # HARDENING: Filtrar por institución del usuario para evitar fugas de secuencia
-        inst = self.request.user.institution
+        inst = getattr(self.request, 'tenant', None)
+        if not inst:
+            raise ValidationError('No institution context found')
         last_note = DebitNote.objects.filter(invoice__institution=inst).order_by('-id').first()
         seq = (last_note.id + 1) if last_note else 1
         number = f"ND-{str(seq).zfill(6)}"
-        serializer.save(number=number)
+        serializer.save(number=number, institution=self.request.tenant)

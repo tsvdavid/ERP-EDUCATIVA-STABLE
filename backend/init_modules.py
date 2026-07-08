@@ -4,7 +4,6 @@
 Purpose
 -------
 - Create the minimal set of *Module* records required by the frontend menu.
-- Associate those modules with the **active** Subscription (status = 'ACTIVE').
 - The script is **idempotent** – running it repeatedly will never create duplicate rows.
 - No data is deleted, migrations are untouched, and existing institutions/subscriptions are preserved.
 
@@ -33,7 +32,7 @@ django.setup()
 # ---------------------------------------------------------------------------
 # Imports
 # ---------------------------------------------------------------------------
-from subscriptions.models import Module, Subscription, SubscriptionModule
+from subscriptions.models import Module
 from django.db import transaction
 
 # ---------------------------------------------------------------------------
@@ -71,41 +70,13 @@ def create_modules():
     return modules
 
 
-def link_modules_to_subscription(modules):
-    """Link each module to the *active* subscription.
-
-    The system defines a one‑to‑many relationship via ``SubscriptionModule``.
-    The function is also idempotent – ``get_or_create`` guarantees no duplicates.
-    """
-    # Find the subscription that is ACTIVE. There should be exactly one per institution.
-    subscription = Subscription.objects.filter(status="ACTIVE").first()
-    if not subscription:
-        print("[!] No active Subscription found – skipping linking step.")
-        return
-
-    print(f"[i] Active subscription: {subscription.id} (institution: {subscription.institution})")
-
-    for module in modules:
-        obj, created = SubscriptionModule.objects.get_or_create(
-            subscription=subscription, module=module
-        )
-        if created:
-            print(f"[+] Linked Module '{module.code}' to Subscription {subscription.id}")
-        else:
-            # Already linked – nothing to do.
-            pass
-
-
 def main():
     print("--- ERP‑EDUCATIVA Module bootstrap start ---")
     with transaction.atomic():
-        modules = create_modules()
-        link_modules_to_subscription(modules)
+        create_modules()
     # Summary
     total_modules = Module.objects.count()
-    total_links = SubscriptionModule.objects.count()
     print(f"[✓] Total Module records: {total_modules}")
-    print(f"[✓] Total Subscription‑Module links: {total_links}")
     print("--- bootstrap completed ---")
 
 if __name__ == "__main__":

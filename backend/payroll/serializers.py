@@ -26,15 +26,15 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(EmployeeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
             if 'user' in self.fields:
                 from users.models import User
-                self.fields['user'].queryset = User.objects.filter(institution_id=inst_id)
+                self.fields['user'].queryset = User.objects.filter(institution=tenant)
             if 'department' in self.fields:
-                self.fields['department'].queryset = Department.objects.filter(institution_id=inst_id)
+                self.fields['department'].queryset = Department.objects.filter(institution=tenant)
             if 'position' in self.fields:
-                self.fields['position'].queryset = Position.objects.filter(institution_id=inst_id)
+                self.fields['position'].queryset = Position.objects.filter(institution=tenant)
 
 class WorkShiftSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,14 +54,14 @@ class ContractSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(ContractSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
             if 'employee' in self.fields:
-                self.fields['employee'].queryset = Employee.objects.filter(institution_id=inst_id)
+                self.fields['employee'].queryset = Employee.objects.filter(institution=tenant)
             if 'position' in self.fields:
-                self.fields['position'].queryset = Position.objects.filter(institution_id=inst_id)
+                self.fields['position'].queryset = Position.objects.filter(institution=tenant)
             if 'work_shift' in self.fields:
-                self.fields['work_shift'].queryset = WorkShift.objects.filter(institution_id=inst_id)
+                self.fields['work_shift'].queryset = WorkShift.objects.filter(institution=tenant)
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.ReadOnlyField(source='employee.user.get_full_name')
@@ -88,12 +88,12 @@ class PayrollRollSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(PayrollRollSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
             if 'employee' in self.fields:
-                self.fields['employee'].queryset = Employee.objects.filter(institution_id=inst_id)
+                self.fields['employee'].queryset = Employee.objects.filter(institution=tenant)
             if 'period' in self.fields:
-                self.fields['period'].queryset = PayrollPeriod.objects.filter(institution_id=inst_id)
+                self.fields['period'].queryset = PayrollPeriod.objects.filter(institution=tenant)
 
 class PayrollPeriodSerializer(serializers.ModelSerializer):
     rolls_count = serializers.SerializerMethodField()

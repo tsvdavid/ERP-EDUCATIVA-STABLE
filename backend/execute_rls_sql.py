@@ -1,5 +1,8 @@
 import psycopg2
-import os
+from pathlib import Path
+
+SQL_FILE = Path(__file__).resolve().parent / 'apply_robust_rls_v3.sql'
+
 
 def run_sql_file(filename):
     conn_params = {
@@ -29,5 +32,4 @@ def run_sql_file(filename):
         print(f"Error ejecutando SQL: {e}")
 
 if __name__ == "__main__":
-    sql_path = "/var/www/erpeducativa/ERP-EDUCATIVA/backend/apply_hardening_rls.sql"
-    run_sql_file(sql_path)
+    run_sql_file(SQL_FILE)

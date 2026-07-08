@@ -20,7 +20,7 @@ class SubscriptionModuleSerializer(serializers.ModelSerializer):
     module_name = serializers.ReadOnlyField(source='module.name')
     class Meta:
         model = SubscriptionModule
-        fields = ['id', 'module', 'module_name', 'is_active', 'added_at']
+        fields = ['id', 'module', 'module_name']
 
 class SubscriptionAuditLogSerializer(serializers.ModelSerializer):
     user_name = serializers.ReadOnlyField(source='user.username')
@@ -47,15 +47,36 @@ class SubscriptionListSerializer(serializers.ModelSerializer):
 class SubscriptionDetailSerializer(serializers.ModelSerializer):
     institution_name = serializers.ReadOnlyField(source='institution.name')
     plan_name = serializers.ReadOnlyField(source='plan.name')
-    modules_detail = SubscriptionModuleSerializer(source='modules', many=True, read_only=True)
+    modules_detail = serializers.SerializerMethodField()
     audit_logs = SubscriptionAuditLogSerializer(many=True, read_only=True)
     days_remaining = serializers.ReadOnlyField()
+
+    def get_modules_detail(self, obj):
+        # Source of truth: enabled modules come from the assigned plan.
+        if not obj.plan_id:
+            return []
+        modules = obj.plan.included_modules.all().order_by('name')
+        return [
+            {
+                'id': module.id,
+                'module': module.id,
+                'module_name': module.name,
+            }
+            for module in modules
+        ]
 
     class Meta:
         model = Subscription
         fields = '__all__'
 
 class GlobalSettingsSerializer(serializers.ModelSerializer):
+    default_plan_name = serializers.ReadOnlyField(source='default_plan.name')
+
     class Meta:
         model = GlobalSettings
         fields = '__all__'
+
+    def validate_default_plan(self, value):
+        if value and not value.is_active:
+            raise serializers.ValidationError('El plan predeterminado debe estar activo.')
+        return value

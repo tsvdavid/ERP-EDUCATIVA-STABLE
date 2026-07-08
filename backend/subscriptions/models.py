@@ -9,6 +9,8 @@ class Plan(models.Model):
     base_price_monthly = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     base_price_yearly = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     is_active = models.BooleanField(default=True)
+    is_visible_for_sale = models.BooleanField(default=True)
+    description = models.TextField(blank=True, default='')
     included_modules = models.ManyToManyField('Module', blank=True, related_name='included_in_plans')
 
     def __str__(self):
@@ -66,6 +68,7 @@ class GlobalSettings(models.Model):
     grace_period_days = models.PositiveIntegerField(default=5)
     auto_suspend = models.BooleanField(default=True)
     reminder_days = models.JSONField(default=list) # [30, 15, 7, 3, 1]
+    default_plan = models.ForeignKey('Plan', on_delete=models.SET_NULL, null=True, blank=True, related_name='default_for_settings')
     
     updated_at = models.DateTimeField(auto_now=True)
 

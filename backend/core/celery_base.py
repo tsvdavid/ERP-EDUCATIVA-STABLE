@@ -22,17 +22,22 @@ class TenantAwareTask(celery.Task):
 
     def __call__(self, *args, **kwargs):
         tenant_id = kwargs.pop('tenant_id', None)
+        rls_mode = kwargs.pop('rls_mode', 'tenant')
+        if rls_mode not in ('tenant', 'global_admin'):
+            rls_mode = 'tenant'
         
         # Establecer contexto en el worker
         if tenant_id:
             set_current_tenant_id(tenant_id)
             with connection.cursor() as cursor:
                 # Usamos SET (no LOCAL) porque el worker maneja su propia sesión
-                cursor.execute(f"SET app.current_tenant = '{tenant_id}';")
+                cursor.execute("SET app.rls_mode = %s", [rls_mode])
+                cursor.execute("SET app.current_tenant = %s", [str(tenant_id)])
         else:
             # Bloqueo fail-safe
             set_current_tenant_id(0)
             with connection.cursor() as cursor:
+                cursor.execute("SET app.rls_mode = 'tenant';")
                 cursor.execute("SET app.current_tenant = '0';")
         
         try:
@@ -41,4 +46,5 @@ class TenantAwareTask(celery.Task):
             # Limpiar al terminar la tarea
             with connection.cursor() as cursor:
                 cursor.execute("RESET app.current_tenant;")
+                cursor.execute("RESET app.rls_mode;")
             clear_current_tenant()

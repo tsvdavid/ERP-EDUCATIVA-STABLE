@@ -1,17 +1,27 @@
 from rest_framework import serializers
 from .models import EmailConfig, EmailTemplate, EmailLog
-
+from users.models import User
 class EmailConfigSerializer(serializers.ModelSerializer):
     smtp_password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = EmailConfig
         fields = [
-            'id', 'institution', 'smtp_host', 'smtp_port', 'smtp_user', 
-            'smtp_password', 'use_tls', 'use_ssl', 'sender_name', 
-            'sender_email', 'is_active'
+            'id', 'institution', 'smtp_host', 'smtp_port', 'smtp_user',
+            'smtp_password', 'use_tls', 'use_ssl', 'sender_name',
+            'sender_email', 'is_active',
         ]
-        read_only_fields = ['institution']
+        read_only_fields = ("institution",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) if request else None
+        if tenant:
+            # No FK to User in this serializer, but kept for pattern consistency
+            pass
+        else:
+            pass
 
     def validate(self, data):
         """
@@ -56,14 +66,34 @@ class EmailTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailTemplate
         fields = ['id', 'institution', 'code', 'subject', 'html_body', 'is_active']
-        read_only_fields = ['institution']
+        read_only_fields = ("institution",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) if request else None
+        if tenant:
+            # No direct User FK here
+            pass
+        else:
+            pass
 
 class EmailLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailLog
         fields = [
-            'id', 'institution', 'recipient', 'subject', 'status', 
-            'error_message', 'sent_at', 'created_at', 'reference_id', 
-            'module_origin'
+            'id', 'institution', 'recipient', 'subject', 'status',
+            'error_message', 'sent_at', 'created_at', 'reference_id',
+            'module_origin',
         ]
-        read_only_fields = ['institution', 'created_at', 'sent_at']
+        read_only_fields = ("institution", "created_at", "sent_at")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get('request')
+        tenant = getattr(request, 'tenant', None) if request else None
+        if tenant:
+            # No direct User FK in log
+            pass
+        else:
+            pass

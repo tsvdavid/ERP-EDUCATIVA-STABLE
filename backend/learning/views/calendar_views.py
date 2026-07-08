@@ -11,10 +11,13 @@ class CalendarEventsView(APIView):
 
     def get(self, request):
         user = request.user
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response([])
         events = []
 
         # 1. Tareas (Assignments)
-        assignments_qs = Assignment.objects.all()
+        assignments_qs = Assignment.objects.filter(module__course__institution=tenant)
         if user.role == 'STUDENT':
             enr_course_ids = LMSEnrollment.objects.filter(user=user).values_list('course_id', flat=True)
             assignments_qs = assignments_qs.filter(module__course_id__in=enr_course_ids)
@@ -34,7 +37,9 @@ class CalendarEventsView(APIView):
                 })
 
         # 2. Clases en Vivo (Live Sessions)
-        lessons_qs = Lesson.objects.exclude(meeting_url__isnull=True).exclude(meeting_url='')
+        lessons_qs = Lesson.objects.filter(
+            module__course__institution=tenant
+        ).exclude(meeting_url__isnull=True).exclude(meeting_url='')
         if user.role == 'STUDENT':
             enr_course_ids = LMSEnrollment.objects.filter(user=user).values_list('course_id', flat=True)
             lessons_qs = lessons_qs.filter(module__course_id__in=enr_course_ids)
@@ -67,7 +72,9 @@ class CalendarEventsView(APIView):
             })
 
         # 4. Avisos Institucionales con fecha
-        notices_qs = Notice.objects.exclude(event_date__isnull=True)
+        notices_qs = Notice.objects.filter(
+            Q(author__institution=tenant) | Q(target_course__institution=tenant)
+        ).exclude(event_date__isnull=True).distinct()
         for n in notices_qs:
             events.append({
                 'id': f"notice_{n.id}",

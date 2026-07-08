@@ -17,8 +17,14 @@ class InstructorExportView(APIView):
         export_format = request.query_params.get('format', 'excel')
         course_id = request.query_params.get('course_id')
         user = request.user
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'No institution context found'}, status=status.HTTP_400_BAD_REQUEST)
         
-        submissions = AssignmentSubmission.objects.filter(assignment__module__course__instructor=user).select_related(
+        submissions = AssignmentSubmission.objects.filter(
+            assignment__module__course__instructor=user,
+            assignment__module__course__institution=tenant,
+        ).select_related(
             'student', 'assignment', 'assignment__module', 'assignment__module__course'
         )
         if course_id:
@@ -106,6 +112,9 @@ class InstructorDashboardStatsView(APIView):
 
     def get(self, request):
         user = request.user
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'No institution context found'}, status=400)
         is_admin = hasattr(user, 'role') and str(user.role).upper() == 'ADMIN' or user.is_staff or user.is_superuser
         
         # Estadísticas básicas con logs de depuración
@@ -113,23 +122,28 @@ class InstructorDashboardStatsView(APIView):
             print("--- INICIANDO CAPTURA DE ESTADÍSTICAS DASHBOARD ---")
             if is_admin:
                 print("Modo: ADMIN")
-                total_courses = LMSCourse.objects.all().count()
+                total_courses = LMSCourse.objects.filter(institution=tenant).count()
                 print(f"Cursos LMS: {total_courses}")
-                total_enrolled = LMSEnrollment.objects.values('user').distinct().count()
+                total_enrolled = LMSEnrollment.objects.filter(course__institution=tenant).values('user').distinct().count()
                 print(f"Inscritos LMS: {total_enrolled}")
-                active_students = AcademicEnrollment.objects.filter(student__is_active=True).values('student').distinct().count()
+                active_students = AcademicEnrollment.objects.filter(
+                    student__is_active=True,
+                    student__institution=tenant,
+                ).values('student').distinct().count()
                 print(f"Alumnos Activos Académicos: {active_students}")
-                pending_assignments = AssignmentSubmission.objects.filter(score__isnull=True).count()
+                pending_assignments = AssignmentSubmission.objects.filter(
+                    score__isnull=True,
+                    assignment__module__course__institution=tenant,
+                ).count()
                 print(f"Tareas Pendientes: {pending_assignments}")
                 
-                active_year = AcademicYear.objects.filter(institution=user.institution, is_active=True).first()
+                active_year = AcademicYear.objects.filter(institution=tenant, is_active=True).first()
                 if not active_year:
-                    # HARDENING: Fallback limitado estrictamente a la institución del usuario
-                    active_year = AcademicYear.objects.filter(institution=user.institution).order_by('-year').first()
+                    active_year = AcademicYear.objects.filter(institution=tenant).order_by('-year').first()
                 print(f"Año Lectivo Detectado: {active_year}")
             else:
                 print(f"Modo: DOCENTE ({user.username})")
-                instructor_courses = LMSCourse.objects.filter(instructor=user)
+                instructor_courses = LMSCourse.objects.filter(instructor=user, institution=tenant)
                 total_courses = instructor_courses.count()
                 print(f"Mis Cursos LMS: {total_courses}")
                 
@@ -143,11 +157,12 @@ class InstructorDashboardStatsView(APIView):
                 
                 pending_assignments = AssignmentSubmission.objects.filter(
                     assignment__module__course__instructor=user,
+                    assignment__module__course__institution=tenant,
                     score__isnull=True
                 ).count()
                 print(f"Mis Tareas Pendientes: {pending_assignments}")
                 
-                active_year = AcademicYear.objects.filter(institution=user.institution, is_active=True).first()
+                active_year = AcademicYear.objects.filter(institution=tenant, is_active=True).first()
                 print(f"Año Lectivo Docente: {active_year}")
 
             return Response({
@@ -168,10 +183,14 @@ class UnifiedSubmissionsView(APIView):
 
     def get(self, request):
         user = request.user
+        tenant = getattr(request, 'tenant', None)
+        if not tenant:
+            return Response({'error': 'No institution context found'}, status=400)
         course_id = request.query_params.get('course_id')
         
         queryset = AssignmentSubmission.objects.filter(
-            assignment__module__course__instructor=user
+            assignment__module__course__instructor=user,
+            assignment__module__course__institution=tenant,
         ).select_related(
             'student', 'assignment', 'assignment__module', 'assignment__module__course'
         ).order_by('-submitted_at')

@@ -45,15 +45,16 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(EnrollmentSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
-            if 'student' in self.fields:
-                from users.models import User
-                self.fields['student'].queryset = User.objects.filter(institution_id=inst_id, role='STUDENT')
-            if 'course' in self.fields:
-                self.fields['course'].queryset = Course.objects.filter(institution_id=inst_id)
-            if 'academic_year' in self.fields:
-                self.fields['academic_year'].queryset = AcademicYear.objects.filter(institution_id=inst_id)
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
+            if tenant:
+                if 'student' in self.fields:
+                    from users.models import User
+                    self.fields['student'].queryset = User.objects.filter(institution=tenant, role='STUDENT')
+                if 'course' in self.fields:
+                    self.fields['course'].queryset = Course.objects.filter(institution=tenant)
+                if 'academic_year' in self.fields:
+                    self.fields['academic_year'].queryset = AcademicYear.objects.filter(institution=tenant)
 
     def get_academic_summary(self, obj):
         try:
@@ -103,14 +104,15 @@ class GradeSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(GradeSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
-            if 'enrollment' in self.fields:
-                self.fields['enrollment'].queryset = Enrollment.objects.filter(institution_id=inst_id)
-            if 'subject' in self.fields:
-                self.fields['subject'].queryset = Subject.objects.filter(institution_id=inst_id)
-            if 'category' in self.fields:
-                self.fields['category'].queryset = EvaluationCategory.objects.filter(institution_id=inst_id)
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
+            if tenant:
+                if 'enrollment' in self.fields:
+                    self.fields['enrollment'].queryset = Enrollment.objects.filter(institution=tenant)
+                if 'subject' in self.fields:
+                    self.fields['subject'].queryset = Subject.objects.filter(institution=tenant)
+                if 'category' in self.fields:
+                    self.fields['category'].queryset = EvaluationCategory.objects.filter(institution=tenant)
 
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -138,11 +140,12 @@ class ObservationSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super(ObservationSerializer, self).__init__(*args, **kwargs)
         request = self.context.get('request')
-        if request and hasattr(request, 'user'):
-            inst_id = request.user.institution_id
-            if 'student' in self.fields:
-                from users.models import User
-                self.fields['student'].queryset = User.objects.filter(institution_id=inst_id, role='STUDENT')
-            if 'teacher' in self.fields:
-                from users.models import User
-                self.fields['teacher'].queryset = User.objects.filter(institution_id=inst_id, role__in=['TEACHER', 'ADMIN', 'RECTOR'])
+        if request and hasattr(request, 'tenant'):
+            tenant = request.tenant
+            if tenant:
+                if 'student' in self.fields:
+                    from users.models import User
+                    self.fields['student'].queryset = User.objects.filter(institution=tenant, role='STUDENT')
+                if 'teacher' in self.fields:
+                    from users.models import User
+                    self.fields['teacher'].queryset = User.objects.filter(institution=tenant, role__in=['TEACHER', 'ADMIN', 'RECTOR'])

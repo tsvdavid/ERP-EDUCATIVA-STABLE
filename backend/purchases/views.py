@@ -6,13 +6,13 @@ from .serializers import SupplierSerializer, PurchaseInvoiceSerializer, Purchase
 from users.tenant_mixins import InstitutionFilterMixin
 
 class SupplierViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = Supplier.objects.all()
+    queryset = Supplier.objects.unscoped()
     serializer_class = SupplierSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
 
 class PurchaseInvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = PurchaseInvoice.objects.all()
+    queryset = PurchaseInvoice.objects.unscoped()
     serializer_class = PurchaseInvoiceSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -26,7 +26,8 @@ class PurchaseInvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            created_by=self.request.user
+            created_by=self.request.user,
+            institution=self.request.tenant
         )
 
     @action(detail=True, methods=['post'])
@@ -53,7 +54,7 @@ class PurchaseInvoiceViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
         return Response({'status': 'cancelled'})
 
 class PurchaseCreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = PurchaseCreditNote.objects.all()
+    queryset = PurchaseCreditNote.objects.unscoped()
     serializer_class = PurchaseCreditNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -65,11 +66,12 @@ class PurchaseCreditNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            created_by=self.request.user
+            created_by=self.request.user,
+            institution=self.request.tenant
         )
 
 class PurchaseDebitNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = PurchaseDebitNote.objects.all()
+    queryset = PurchaseDebitNote.objects.unscoped()
     serializer_class = PurchaseDebitNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -81,11 +83,12 @@ class PurchaseDebitNoteViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            created_by=self.request.user
+            created_by=self.request.user,
+            institution=self.request.tenant
         )
 
 class PurchaseLiquidationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
-    queryset = PurchaseLiquidation.objects.all()
+    queryset = PurchaseLiquidation.objects.unscoped()
     serializer_class = PurchaseLiquidationSerializer
     permission_classes = [permissions.IsAuthenticated]
     tenant_field = 'institution'
@@ -99,7 +102,8 @@ class PurchaseLiquidationViewSet(InstitutionFilterMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            created_by=self.request.user
+            created_by=self.request.user,
+            institution=self.request.tenant
         )
 
     @action(detail=True, methods=['post'])

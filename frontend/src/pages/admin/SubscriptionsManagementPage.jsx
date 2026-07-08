@@ -14,15 +14,16 @@ import {
     AlertTriangle,
     CheckCircle2,
     Plus,
-    DollarSign
+    DollarSign,
+    Zap
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 import subscriptionService from '../../services/subscriptionService';
+import ChangePlanModal from '../../components/ChangePlanModal';
 
 const SubscriptionsManagementPage = () => {
     const [subscriptions, setSubscriptions] = useState([]);
     const [plans, setPlans] = useState([]);
-    const [modules, setModules] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [institutionsWithoutSub, setInstitutionsWithoutSub] = useState([]);
@@ -32,21 +33,22 @@ const SubscriptionsManagementPage = () => {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [isActionOpen, setIsActionOpen] = useState(false);
     const [isNewSubModalOpen, setIsNewSubModalOpen] = useState(false);
+    const [isChangePlanOpen, setIsChangePlanOpen] = useState(false);
+    const [changePlanLoading, setChangePlanLoading] = useState(false);
     const [actionType, setActionType] = useState(''); 
-    const [actionData, setActionData] = useState({ date: '', plan_id: '', module_ids: [] });
+    const [actionData, setActionData] = useState({ date: '', plan_id: '' });
+    const [changePlanData, setChangePlanData] = useState({ plan_id: '' });
 
     const loadData = async () => {
         try {
             setLoading(true);
-            const [subsRes, plansRes, modulesRes, noSubRes] = await Promise.all([
+            const [subsRes, plansRes, noSubRes] = await Promise.all([
                 subscriptionService.getSubscriptions(),
                 subscriptionService.getPlans(),
-                subscriptionService.getModules(),
                 subscriptionService.getInstitutionsWithoutSubscription()
             ]);
             setSubscriptions(subsRes);
             setPlans(plansRes);
-            setModules(modulesRes);
             setInstitutionsWithoutSub(noSubRes);
         } catch (error) {
             toast.error("Error al cargar datos del sistema.");
@@ -74,14 +76,8 @@ const SubscriptionsManagementPage = () => {
         setSelectedSub(sub);
         if (type === 'edit-dates') {
             setActionData({ date: sub.next_billing_date });
-        } else if (type === 'change-plan') {
-            setActionData({ plan_id: sub.plan || '' });
         } else if (type === 'confirm-payment') {
             setActionData({ amount: sub.monthly_fee, months_to_extend: 1, notes: '' });
-        } else if (type === 'modules') {
-            // Need to fetch full detail for modules if not available
-            const detail = await subscriptionService.getSubscription(sub.id);
-            setActionData({ module_ids: (detail?.modules_detail || []).map(m => m.module) });
         }
         setIsActionOpen(true);
     };
@@ -91,18 +87,53 @@ const SubscriptionsManagementPage = () => {
         try {
             if (actionType === 'edit-dates') {
                 await subscriptionService.editDates(selectedSub.id, actionData.date);
-            } else if (actionType === 'change-plan') {
-                await subscriptionService.changePlan(selectedSub.id, actionData.plan_id);
             } else if (actionType === 'confirm-payment') {
                 await subscriptionService.confirmPayment(selectedSub.id, actionData);
-            } else if (actionType === 'modules') {
-                await subscriptionService.updateModules(selectedSub.id, actionData.module_ids);
             }
             toast.success("Operación completada con éxito.");
             setIsActionOpen(false);
             loadData();
         } catch (error) {
             toast.error("Error al ejecutar la acción.");
+        }
+    };
+
+    const openChangePlanModal = async (sub) => {
+        try {
+            const detail = await subscriptionService.getSubscription(sub.id);
+            setSelectedSub(detail);
+            setChangePlanData({
+                plan_id: String(sub.plan || ''),
+            });
+            setIsChangePlanOpen(true);
+        } catch (error) {
+            toast.error('Error al cargar detalle para cambio de plan.');
+        }
+    };
+
+    const submitChangePlan = async () => {
+        if (!selectedSub?.id || !changePlanData.plan_id) {
+            toast.error('Debe seleccionar un plan.');
+            return;
+        }
+
+        if (!window.confirm('¿Está seguro de cambiar el plan de esta institución?')) {
+            return;
+        }
+
+        try {
+            setChangePlanLoading(true);
+            await subscriptionService.changePlan(
+                selectedSub.id,
+                changePlanData.plan_id
+            );
+            toast.success('Plan actualizado correctamente.');
+            setIsChangePlanOpen(false);
+            loadData();
+        } catch (error) {
+            toast.error(error?.response?.data?.message || 'Error al cambiar el plan.');
+        } finally {
+            setChangePlanLoading(false);
         }
     };
 
@@ -173,9 +204,9 @@ const SubscriptionsManagementPage = () => {
             </div>
 
             {/* Subscriptions Table */}
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full min-w-[980px] text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
                                 <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Institución</th>
@@ -183,7 +214,7 @@ const SubscriptionsManagementPage = () => {
                                 <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Estado</th>
                                 <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Vencimiento / Corte</th>
                                 <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest">Días Libres</th>
-                                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                                <th className="px-6 py-4 min-w-[260px] text-xs font-black text-slate-400 uppercase tracking-widest text-right sticky right-0 bg-slate-50/95 z-10">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -225,8 +256,8 @@ const SubscriptionsManagementPage = () => {
                                             {sub.days_remaining} días
                                         </div>
                                     </td>
-                                    <td className="px-6 py-5 text-right">
-                                        <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <td className="px-6 py-5 text-right min-w-[260px] sticky right-0 bg-white z-10">
+                                        <div className="flex justify-end gap-2 flex-nowrap">
                                             <button onClick={() => openDetail(sub)} className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-100 rounded-lg" title="Auditoría/Detalle"><History size={16} /></button>
                                             {sub.status === 'TRIAL_ACTIVE' && (
                                                 <button onClick={async () => {
@@ -243,7 +274,7 @@ const SubscriptionsManagementPage = () => {
                                                 <button onClick={() => runStatusAction(sub.id, 'reactivate')} className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-100 rounded-lg" title="Reactivar"><Play size={16} /></button>
                                             )}
                                             <button onClick={() => handleAction('confirm-payment', sub)} className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-100 rounded-lg" title="Confirmar Pago (Renovar)"><DollarSign size={16} /></button>
-                                            <button onClick={() => handleAction('change-plan', sub)} className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-100 rounded-lg" title="Cambiar Plan"><CreditCard size={16} /></button>
+                                            <button onClick={() => openChangePlanModal(sub)} className="p-2 text-slate-400 hover:text-indigo-600 bg-slate-100 rounded-lg" title="Cambiar Plan"><CreditCard size={16} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -302,7 +333,6 @@ const SubscriptionsManagementPage = () => {
                                             <p className="text-[10px] text-slate-400 font-bold uppercase italic">No hay módulos asignados</p>
                                         )}
                                     </div>
-                                    <button onClick={() => { setIsDetailOpen(false); handleAction('modules', selectedSub); }} className="w-full mt-4 py-2 text-xs font-black text-indigo-600 hover:text-indigo-700 uppercase tracking-widest">Gestionar Accesos</button>
                                 </div>
                             </div>
 
@@ -343,9 +373,7 @@ const SubscriptionsManagementPage = () => {
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-[2rem] shadow-2xl max-w-md w-full p-8">
                         <h3 className="text-2xl font-black text-slate-800 mb-2">
-                            {actionType === 'edit-dates' ? 'Ajustar Fecha' : 
-                             actionType === 'change-plan' ? 'Cambiar Plan' : 
-                             actionType === 'confirm-payment' ? 'Confirmar Pago' : 'Gestionar Módulos'}
+                               {actionType === 'edit-dates' ? 'Ajustar Fecha' : 'Confirmar Pago'}
                         </h3>
                         <p className="text-slate-500 text-sm mb-6">Realizando cambios para <strong>{selectedSub?.institution_name}</strong>.</p>
                         
@@ -378,51 +406,6 @@ const SubscriptionsManagementPage = () => {
                                     />
                                 </div>
                             )}
-
-                            {actionType === 'change-plan' && (
-                                <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Seleccionar Nuevo Plan</label>
-                                    <select 
-                                        required className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 font-bold text-slate-700 appearance-none"
-                                        value={actionData.plan_id} onChange={e => setActionData({...actionData, plan_id: e.target.value})}
-                                    >
-                                        <option value="">-- Seleccionar Plan --</option>
-                                        {plans.map(p => <option key={p.id} value={p.id}>{p.name} - ${p.base_price_monthly}/mes</option>)}
-                                    </select>
-                                    <div className="mt-4 p-4 bg-amber-50 rounded-2xl flex gap-3 text-amber-700 text-xs font-medium">
-                                        <AlertTriangle size={16} className="shrink-0" />
-                                        Este cambio actualizará el costo mensual de la siguiente facturación automáticamente.
-                                    </div>
-                                </div>
-                            )}
-
-                            {actionType === 'modules' && (
-                                <div>
-                                    <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Módulos Personalizados</label>
-                                    <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                                        {modules.map(mod => (
-                                            <button
-                                                key={mod.id} type="button"
-                                                onClick={() => setActionData(prev => ({
-                                                    ...prev,
-                                                    module_ids: prev.module_ids.includes(mod.id)
-                                                        ? prev.module_ids.filter(id => id !== mod.id)
-                                                        : [...prev.module_ids, mod.id]
-                                                }))}
-                                                className={`w-full flex items-center justify-between px-5 py-3 rounded-xl border-2 transition-all font-bold text-sm ${
-                                                    actionData.module_ids.includes(mod.id)
-                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                                    : 'border-slate-100 bg-slate-50 text-slate-400'
-                                                }`}
-                                            >
-                                                {mod.name}
-                                                {actionData.module_ids.includes(mod.id) && <CheckCircle2 size={16} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
                             <div className="flex gap-4">
                                 <button type="button" onClick={() => setIsActionOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold">Cancelar</button>
                                 <button type="submit" className="flex-1 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100">Aplicar</button>
@@ -431,6 +414,17 @@ const SubscriptionsManagementPage = () => {
                     </div>
                 </div>
             )}
+
+            <ChangePlanModal
+                isOpen={isChangePlanOpen}
+                subscription={selectedSub}
+                plans={plans}
+                loading={changePlanLoading}
+                planId={changePlanData.plan_id}
+                onPlanChange={(plan_id) => setChangePlanData(prev => ({ ...prev, plan_id }))}
+                onClose={() => setIsChangePlanOpen(false)}
+                onConfirm={submitChangePlan}
+            />
             {/* New Subscription Modal */}
             {isNewSubModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">

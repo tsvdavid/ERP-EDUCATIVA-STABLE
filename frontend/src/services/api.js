@@ -39,7 +39,7 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
         // Evitar intentar refrescar si el error viene del propio endpoint de login o refresh
-        if (error.response && error.response.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/login') && !originalRequest.url.includes('/auth/refresh')) {
+        if (error.response && error.response.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/token/') && !originalRequest.url.includes('/auth/login') && !originalRequest.url.includes('/auth/refresh')) {
             originalRequest._retry = true;
             try {
                 const refreshToken = localStorage.getItem('refresh_token');

@@ -2,11 +2,13 @@ from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
 import logging
-
+from users.models import Institution
 logger = logging.getLogger(__name__)
 
 @shared_task
-def daily_subscription_check():
+def daily_subscription_check(tenant_id: int):
+    if not tenant_id:
+        raise ValueError("tenant_id required")
     """
     Se ejecuta diariamente para revisar expiraciones, cambiar estados (GRACE, SUSPENDED)
     y enviar alertas (30, 15, 7, 3, 1 días).
@@ -19,7 +21,7 @@ def daily_subscription_check():
     
     try:
         # 1. Evaluate Expirations and Suspensions
-        active_or_grace = Subscription.objects.filter(status__in=['ACTIVE', 'GRACE', 'EXPIRING'])
+        active_or_grace = Subscription.objects.filter(status__in=['ACTIVE', 'GRACE', 'EXPIRING'], institution_id=tenant_id)
         
         for sub in active_or_grace:
             days_left = (sub.next_billing_date - today).days
@@ -89,7 +91,9 @@ def daily_subscription_check():
     return "Check complete"
 
 @shared_task
-def capture_daily_kpis():
+def capture_daily_kpis(tenant_id: int):
+    if not tenant_id:
+        raise ValueError("tenant_id required")
     """
     Captura métricas de facturación diariamente para tendencias.
     """
@@ -100,7 +104,7 @@ def capture_daily_kpis():
     today = timezone.now().date()
     
     try:
-        all_subs = Subscription.objects.all()
+        all_subs = Subscription.objects.filter(institution_id=tenant_id)
         
         mrr = all_subs.filter(status__in=['ACTIVE', 'GRACE', 'EXPIRING']).aggregate(total=Sum('monthly_fee'))['total'] or 0
         active_count = all_subs.filter(status='ACTIVE').count()
@@ -108,7 +112,8 @@ def capture_daily_kpis():
         suspended_count = all_subs.filter(status='SUSPENDED').count()
         
         payments_today = SubscriptionPayment.objects.filter(
-            payment_date__date=today
+            payment_date__date=today,
+            subscription__institution_id=tenant_id
         ).aggregate(total=Sum('amount'))['total'] or 0
         
         DailyKPI.objects.update_or_create(
@@ -129,3 +134,16 @@ def capture_daily_kpis():
             metadata_json={'task': 'capture_daily_kpis', 'error': str(e)}
         )
         raise e
+
+@shared_task
+def run_daily_subscription_check_for_all_tenants():
+    """Fan‑out wrapper: schedules a tenant‑aware daily_subscription_check for every institution."""
+    for institution in Institution.objects.all():
+        daily_subscription_check.delay(institution.id)
+
+@shared_task
+def run_capture_daily_kpis_for_all_tenants():
+    """Fan‑out wrapper: schedules capture_daily_kpis for every institution."""
+    for institution in Institution.objects.all():
+        capture_daily_kpis.delay(institution.id)
+

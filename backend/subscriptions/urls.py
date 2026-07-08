@@ -10,5 +10,7 @@ router.register(r'observability', ObservabilityViewSet, basename='subscription-o
 router.register(r'my-billing', MySubscriptionViewSet, basename='my-subscription')
 
 urlpatterns = [
+    path('plans/modules-catalog', PlanViewSet.as_view({'get': 'modules_catalog'})),
+    path('plans/modules-catalog/', PlanViewSet.as_view({'get': 'modules_catalog'}), name='subscription-plans-modules-catalog-explicit'),
     path('', include(router.urls)),
 ]

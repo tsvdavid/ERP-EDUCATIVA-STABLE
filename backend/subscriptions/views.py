@@ -4,18 +4,48 @@ from rest_framework.response import Response
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Sum
+from django.db import transaction
 
-from .models import Subscription, SubscriptionPayment, SubscriptionModule, Module, SubscriptionAuditLog, Plan, GlobalSettings
+from .models import Subscription, SubscriptionPayment, Module, SubscriptionAuditLog, Plan, GlobalSettings
 from .serializers import SubscriptionListSerializer, SubscriptionDetailSerializer, PlanSerializer, GlobalSettingsSerializer
+
+PLAN_MODULE_CATALOG_CODES = [
+    'academic',
+    'portal_digital',
+    'administrative',
+    'health_wellbeing',
+    'payroll_rrhh',
+    'accounting',
+    'sales',
+    'purchases',
+    'help',
+    'privacy',
+    'maintenance',
+    'saas_management',
+]
 
 class IsGlobalAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_superuser)
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_superuser or getattr(request.user, 'role', None) == 'GLOBAL')
+        )
 
 class PlanViewSet(viewsets.ModelViewSet):
     permission_classes = [IsGlobalAdmin]
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
+
+    @action(detail=False, methods=['get'], url_path='modules-catalog')
+    def modules_catalog(self, request):
+        from .serializers import ModuleSerializer
+
+        qs = Module.objects.filter(code__in=PLAN_MODULE_CATALOG_CODES)
+        # Keep compatibility if an is_active field is added in the future.
+        if any(f.name == 'is_active' for f in Module._meta.fields):
+            qs = qs.filter(is_active=True)
+        return Response(ModuleSerializer(qs.order_by('name'), many=True).data)
 
 class GlobalSettingsViewSet(viewsets.ModelViewSet):
     permission_classes = [IsGlobalAdmin]
@@ -105,10 +135,15 @@ class SubscriptionAdminViewSet(viewsets.ModelViewSet):
         institution = getattr(request, "tenant", None)
         if not institution:
             return Response([], status=200)
-        qs = Module.objects.filter(
-            subscriptionmodule__subscription__institution=institution,
-            subscriptionmodule__subscription__status="ACTIVE"
-        ).distinct()
+        subscription = (
+            Subscription.objects.select_related('plan')
+            .prefetch_related('plan__included_modules')
+            .filter(institution=institution, status='ACTIVE')
+            .first()
+        )
+        if not subscription or not subscription.plan_id:
+            return Response([], status=200)
+        qs = subscription.plan.included_modules.all().order_by('name')
         return Response(ModuleSerializer(qs, many=True).data)
 
     @action(detail=False, methods=['get'])
@@ -239,28 +274,84 @@ class SubscriptionAdminViewSet(viewsets.ModelViewSet):
         )
         return Response({'message': 'Suscripción cancelada permanentemente.'})
     
-    @action(detail=True, methods=['post'], url_path='change-plan')
+    @action(detail=True, methods=['post', 'patch'], url_path='change-plan')
     def change_plan(self, request, pk=None):
         sub = self.get_object()
         plan_id = request.data.get('plan_id')
         if not plan_id:
-            return Response({'error': 'plan_id es requerido'}, status=400)
-            
+            return Response({'success': False, 'message': 'plan_id es requerido'}, status=400)
+
+        raw_apply_modules = request.data.get('apply_modules', True)
+        if isinstance(raw_apply_modules, str):
+            apply_modules = raw_apply_modules.strip().lower() in ('1', 'true', 'yes', 'on')
+        else:
+            apply_modules = bool(raw_apply_modules)
+
         try:
-            plan = Plan.objects.get(id=plan_id)
+            plan = Plan.objects.get(id=plan_id, is_active=True)
+        except Plan.DoesNotExist:
+            return Response({'success': False, 'message': 'Plan no encontrado o inactivo'}, status=404)
+
+        if not sub.institution_id:
+            return Response({'success': False, 'message': 'La suscripción no tiene institución válida'}, status=400)
+
+        old_plan_name = sub.plan.name if sub.plan else None
+        old_plan_id = sub.plan_id
+        old_module_ids = list(sub.plan.included_modules.values_list('id', flat=True)) if sub.plan_id else []
+
+        if old_plan_id == plan.id:
+            return Response({
+                'success': True,
+                'message': 'La suscripción ya tiene ese plan.',
+                'subscription': SubscriptionListSerializer(sub).data,
+            }, status=200)
+
+        cycle_days = {
+            'MONTHLY': 30,
+            'QUARTERLY': 90,
+            'SEMIANNUAL': 180,
+            'YEARLY': 365,
+        }
+
+        with transaction.atomic():
             sub.plan = plan
-            sub.monthly_fee = plan.base_price_monthly # Update fee based on plan
-            sub.save()
-            
+            sub.monthly_fee = plan.base_price_monthly
+
+            if sub.next_billing_date and sub.next_billing_date < timezone.now().date():
+                sub.next_billing_date = timezone.now().date() + timedelta(
+                    days=cycle_days.get(sub.billing_cycle, 30)
+                )
+
+            sub.save(update_fields=['plan', 'monthly_fee', 'next_billing_date', 'updated_at'])
+
+            # Keep compatibility with existing payloads. Enabled modules are
+            # now derived from plan.included_modules and not persisted per subscription.
+            new_module_ids = list(plan.included_modules.values_list('id', flat=True))
+
             SubscriptionAuditLog.objects.create(
-                event_type='PAYMENT_CONFIRMED',
+                event_type='PLAN_CHANGED',
                 institution=sub.institution,
                 user=request.user,
-                metadata_json={'action': 'Cambio de plan', 'new_plan': plan.name}
+                metadata_json={
+                    'action': 'change_plan',
+                    'subscription_id': sub.id,
+                    'old_plan_id': old_plan_id,
+                    'old_plan_name': old_plan_name,
+                    'new_plan_id': plan.id,
+                    'new_plan_name': plan.name,
+                    'apply_modules': apply_modules,
+                    'old_module_ids': old_module_ids,
+                    'new_module_ids': new_module_ids,
+                    'changed_at': timezone.now().isoformat(),
+                }
             )
-            return Response({'message': f'Plan cambiado a {plan.name}.'})
-        except Plan.DoesNotExist:
-            return Response({'error': 'Plan no encontrado'}, status=404)
+
+        sub.refresh_from_db()
+        return Response({
+            'success': True,
+            'message': 'Plan actualizado correctamente',
+            'subscription': SubscriptionListSerializer(sub).data,
+        })
 
     @action(detail=True, methods=['post'], url_path='edit-dates')
     def edit_dates(self, request, pk=None):
@@ -280,21 +371,16 @@ class SubscriptionAdminViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='update-modules')
     def update_modules(self, request, pk=None):
-        sub = self.get_object()
-        module_ids = request.data.get('module_ids', [])
-        
-        # Sync modules
-        sub.modules.all().delete()
-        for m_id in module_ids:
-            SubscriptionModule.objects.create(subscription=sub, module_id=m_id)
-            
-        SubscriptionAuditLog.objects.create(
-            event_type='PAYMENT_CONFIRMED',
-            institution=sub.institution,
-            user=request.user,
-            metadata_json={'action': 'Actualización de módulos', 'modules': module_ids}
+        return Response(
+            {
+                'message': (
+                    'La personalización de módulos por suscripción fue deshabilitada. '
+                    'Configure módulos en el plan y cambie el plan de la suscripción.'
+                ),
+                'code': 'MODULE_OVERRIDE_DISABLED',
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
-        return Response({'message': 'Módulos actualizados correctamente.'})
 
 class ObservabilityViewSet(viewsets.ViewSet):
     permission_classes = [IsGlobalAdmin]
@@ -355,22 +441,35 @@ class MySubscriptionViewSet(viewsets.ViewSet):
     
     @action(detail=False, methods=['get'], url_path='info')
     def info(self, request):
-        if request.user.is_superuser:
-            return Response({'error': 'Superusers do not have an institution subscription'}, status=400)
-            
-        try:
-            sub = request.user.institution.subscription
-            modules = sub.modules.all().select_related('module')
-            
+        """Return billing info for the institution resolved from the request.
+        The tenant resolution follows:
+        1) X-Institution-ID header
+        2) JWT claim ``institution`` (or ``institution_id``)
+        3) request.user.institution (fallback)
+        """
+        from core.tenancy.utils import get_current_institution
+        # Resolve the institution for this request
+        institution = get_current_institution(request)
+        if not institution:
             return Response({
-                'id': sub.id,
-                'status': sub.status,
-                'next_billing_date': sub.next_billing_date,
-                'grace_until': sub.grace_until,
-                'monthly_fee': float(sub.monthly_fee),
-                'plan_name': sub.plan.name if sub.plan else 'Personalizado',
-                'modules': [m.module.name for m in modules],
-                'payment_instructions': "Para renovar su suscripción, por favor realice un depósito o transferencia a la Cuenta Corriente N° 123456789 del Banco Pichincha a nombre de Eduka360 S.A. y envíe el comprobante a facturacion@eduka360.com."
-            })
+                'error': 'Institution not resolved from request.'
+            }, status=400)
+        try:
+            sub = institution.subscription
         except Subscription.DoesNotExist:
-            return Response({'error': 'No hay suscripción activa para esta institución.'}, status=404)
+            return Response({
+                'error': 'No hay suscripción activa para esta institución.'
+            }, status=404)
+        modules = sub.plan.included_modules.all().order_by('name') if sub.plan_id else []
+        return Response({
+            'id': sub.id,
+            'institution': institution.name,
+            'status': sub.status,
+            'next_billing_date': sub.next_billing_date,
+            'grace_until': sub.grace_until,
+            'monthly_fee': float(sub.monthly_fee),
+            'plan_name': sub.plan.name if sub.plan else 'Personalizado',
+            'modules': [m.name for m in modules],
+            'module_codes': [m.code for m in modules],
+            'payment_instructions': "Para renovar su suscripción, por favor realice un depósito o transferencia a la Cuenta Corriente N° 123456789 del Banco Pichincha a nombre de Eduka360 S.A. y envíe el comprobante a facturacion@eduka360.com."
+        })

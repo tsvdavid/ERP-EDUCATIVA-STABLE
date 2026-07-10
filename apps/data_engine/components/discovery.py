@@ -26,7 +26,7 @@ def auto_register(registry: MacRegistry) -> None:
     package = importlib.import_module(__name__.rsplit('.', 1)[0])
     
     # Define the sub-packages to scan in sorted order
-    sub_packages = sorted(["", "connectors", "exporters", "transformers", "readers", "parsers", "validators"])
+    sub_packages = sorted(["", "connectors", "exporters", "transformers", "readers", "parsers", "validators", "mappers", "casters"])
     
     for sub in sub_packages:
         pkg_name = package.__name__ if not sub else f"{package.__name__}.{sub}"

@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from corsheaders.defaults import default_headers
+from .mac_settings import MAC_ENABLED
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -73,6 +74,16 @@ INSTALLED_APPS = [
     'payroll',
     'subscriptions',
 ]
+
+# --------------------------------------------------------------
+# MAC feature‑flag – conditional registration of the data_engine app
+# --------------------------------------------------------------
+if MAC_ENABLED:
+    INSTALLED_APPS = [
+        *INSTALLED_APPS,
+        "apps.data_engine.apps.DataEngineConfig",
+    ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

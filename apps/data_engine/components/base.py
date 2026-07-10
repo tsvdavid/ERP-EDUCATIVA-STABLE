@@ -32,3 +32,13 @@ class BaseComponent(BaseService, ABC):
         """Process the supplied *context* and return a result.
         """
         raise NotImplementedError
+
+
+def component_name(cls: type) -> str:
+    """Return a snake_case name derived from the class name."""
+    import re
+    name = getattr(cls, "__name__", str(cls))
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
+
+
+__all__ = ["MacContext", "BaseComponent", "component_name"]

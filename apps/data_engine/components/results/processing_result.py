@@ -30,6 +30,16 @@ class ProcessingResult:
         # or you can define your own success criteria.
         success = len(errors) == 0
         
+        # Integrate reconciliation manifest if present (TAREA 15)
+        manifest = metadata.get("pipeline_manifest")
+        if manifest:
+            status_val = getattr(manifest, "status", None)
+            if hasattr(status_val, "value"):
+                status_val = status_val.value
+            if str(status_val) == "CRITICAL_DROP":
+                success = False
+            metadata["manifest"] = manifest
+        
         return cls(
             success=success,
             data=payload,

@@ -26,7 +26,7 @@ def auto_register(registry: MacRegistry) -> None:
     package = importlib.import_module(__name__.rsplit('.', 1)[0])
     
     # Define the sub-packages to scan in sorted order
-    sub_packages = sorted(["", "connectors", "exporters", "transformers", "readers", "parsers", "validators", "mappers", "casters", "schemas", "rules", "staging", "importers"])
+    sub_packages = sorted(["", "connectors", "exporters", "transformers", "readers", "parsers", "validators", "mappers", "casters", "schemas", "rules", "staging", "importers", "reconciliation"])
     
     for sub in sub_packages:
         pkg_name = package.__name__ if not sub else f"{package.__name__}.{sub}"
@@ -39,7 +39,10 @@ def auto_register(registry: MacRegistry) -> None:
             if is_pkg or module_name.startswith('test') or module_name == '__pycache__':
                 continue
                 
-            module = importlib.import_module(f"{pkg_name}.{module_name}")
+            try:
+                module = importlib.import_module(f"{pkg_name}.{module_name}")
+            except (ImportError, AttributeError):
+                continue
             for _, obj in inspect.getmembers(module, inspect.isclass):
                 # Ensure it's a subclass of BaseComponent but not an abstract base class
                 if issubclass(obj, BaseComponent) and not inspect.isabstract(obj) and obj is not BaseComponent:

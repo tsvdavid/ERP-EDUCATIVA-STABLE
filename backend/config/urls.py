@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/ai/', include('ai.urls')),
     path('api/health/', include('health.urls')),
     path('api/notifications/', include('notifications.urls')),
+    path('api/data-engine/', include('apps.data_engine.api.urls')),
 ]
 
 from django.conf import settings

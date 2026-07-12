@@ -22,7 +22,9 @@ class DummyConnector(BaseComponent):
     component_type = "connector"
 
     def execute(self, context: MacContext):  # type: ignore[override]
-        return {"payload": {"dummy": "value"}, "metadata": {"processed": True}}
+        meta = dict(context.get("metadata", {}))
+        meta["processed"] = True
+        return {"payload": {"dummy": "value"}, "metadata": meta}
 
 @pytest.fixture(autouse=True)
 def reset_registry(monkeypatch):
@@ -36,6 +38,8 @@ def _reload_settings(monkeypatch, enabled: str):
     monkeypatch.setenv("MAC_ENABLED", enabled)
     import backend.config.mac_settings as cfg
     importlib.reload(cfg)
+    import apps.data_engine.services.data_ingestor as di
+    importlib.reload(di)
 
 def test_mac_disabled_raises(monkeypatch):
     _reload_settings(monkeypatch, "false")
